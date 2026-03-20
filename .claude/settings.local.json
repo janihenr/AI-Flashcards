@@ -1,0 +1,26 @@
+{
+  "permissions": {
+    "allow": [
+      "WebSearch",
+      "WebFetch(domain:www.glukhov.org)",
+      "WebFetch(domain:github.com)",
+      "WebFetch(domain:dev.to)",
+      "WebFetch(domain:pockit.tools)",
+      "WebFetch(domain:strapi.io)",
+      "WebFetch(domain:memoforge.app)",
+      "WebFetch(domain:techbuzzonline.com)",
+      "WebFetch(domain:intuitionlabs.ai)",
+      "WebFetch(domain:appstackbuilder.com)",
+      "WebFetch(domain:blog.risingstack.com)",
+      "WebFetch(domain:expertium.github.io)",
+      "WebFetch(domain:borretti.me)",
+      "WebFetch(domain:www.indiehackers.com)",
+      "WebFetch(domain:kinde.com)",
+      "WebFetch(domain:www.lesswrong.com)",
+      "WebFetch(domain:domenic.me)",
+      "WebFetch(domain:cookbook.openai.com)",
+      "Bash(find:*)",
+      "Bash(gh auth:*)"
+    ]
+  }
+}
