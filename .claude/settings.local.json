@@ -20,7 +20,11 @@
       "WebFetch(domain:domenic.me)",
       "WebFetch(domain:cookbook.openai.com)",
       "Bash(find:*)",
-      "Bash(gh auth:*)"
+      "Bash(gh auth:*)",
+      "Bash(ls:*)",
+      "WebFetch(domain:create.t3.gg)",
+      "WebFetch(domain:azure.microsoft.com)",
+      "WebFetch(domain:learn.microsoft.com)"
     ]
   }
 }
