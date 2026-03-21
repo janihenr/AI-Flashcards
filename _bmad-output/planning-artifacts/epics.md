@@ -16,9 +16,9 @@ This document provides the complete epic and story breakdown for Flashcards, dec
 
 ### Functional Requirements
 
-FR1: Anonymous users can access and study a pre-built cold start deck without creating an account
+FR1: Anonymous users can access and study a pre-built cold start deck without creating an account — deck: "5 Science-Backed Memory Techniques", 10 cards, all three CardModes represented, seeded via seed.sql
 FR2: Anonymous users can initiate account creation directly from within the cold start deck experience
-FR3: Users can sign up using Google OAuth or email/password
+FR3: Users can sign up using Google OAuth or email/password; signup requires ToS acceptance including age 13+ confirmation
 FR4: Users invited to a team workspace can sign up using their work email via an invite link
 FR5: Users can create, log in to, and log out of their account
 FR6: Users can update their profile information
@@ -40,27 +40,27 @@ FR21: The system schedules card reviews using the FSRS-6 spaced repetition algor
 FR22: Users can rate their recall confidence after each card, which drives FSRS-6 scheduling
 FR23: Users can view their Depth Score — a cumulative measure of retention quality — per deck
 FR24: Users can identify and study weak cards (low retention) in isolation within a deck
-FR25: The system presents card content in adaptive formats (text, image, contextual narrative) based on the user's Learning Fingerprint
+FR25: The system presents card content in adaptive formats (qa, image, context-narrative) based on the user's Learning Fingerprint format preference vector
 FR26: Study session progress is persisted automatically on session completion
 FR27: Authenticated users can generate a deck from a topic prompt using AI
 FR28: Authenticated users can generate cards from pasted text using AI
 FR29: Users can review, edit, and delete AI-generated cards before saving to a deck
-FR30: The system silently builds a Learning Fingerprint for each user based on study behavior and response patterns
-FR31: The Learning Fingerprint influences card format selection and content presentation style over time
+FR30: Learning Fingerprint has two layers — Layer 1 (all authenticated users): FSRS-6 scheduling via user_fsrs_params; Layer 2 (Pro/Team only): format_preferences JSONB EMA tracking engagement per CardMode, updated on session completion; Free users locked to qa mode; reviews.presentation_mode and response_time_ms written for all tiers for upgrade continuity; no fingerprint signals written for anonymous sessions
+FR31: For Pro/Team users, Layer 2 format preference vector determines card mode at study time and biases AI generation prompts; Free users always shown qa mode; new Pro users default to qa until >5 sessions accumulated
 FR32: AI card generation for free-tier users is subject to a monthly usage limit
 FR33: AI card generation for free-tier users requires an admin spend-approval flag to be enabled
 FR34: The system sanitizes and validates all user-supplied content before passing it to AI generation
 FR35: Before AI deck generation, the system prompts users to specify their learning goal and personal context; AI-generated card content is framed through that stated goal
 FR36: The system measures and logs response hesitation time as a Learning Fingerprint signal; sustained hesitation on nominally mastered cards automatically schedules them for deeper review
 FR37: Users can upgrade from Free to Pro tier via a subscription checkout flow
-FR38: Team admins can purchase and manage a Team subscription
+FR38: Team admins can purchase and manage a Team subscription; Stripe checkout enforces minimum 3 seats (quantity: Math.max(seatCount, 3)); UI prevents selecting fewer than 3
 FR39: Users can view their current subscription tier, remaining usage limits, and billing history
 FR40: Users can cancel their subscription at any time
 FR41: The system automatically grants and revokes feature access based on the user's active subscription tier
 FR42: Authenticated users can create a named team workspace
 FR43: Team admins can invite members by providing a list of email addresses
 FR44: The system validates each email address in the invite list and flags invalid entries before sending invitations
-FR45: Invited users receive an email invitation with a link to sign up or log in and join the workspace
+FR45: Invited users receive an email invitation with a link to sign up or log in and join the workspace; on invite acceptance, profiles.tier is set to team_member/team_admin; prior Pro users see a UI notice that their individual subscription is still active and being charged, with a link to billing settings to cancel if desired; profiles.previous_tier stores the prior tier for notice display
 FR46: Team admins can assign a deck to all or selected team members
 FR47: Team members can view and study all decks assigned to them
 FR48: Team admins can view aggregate study progress per assigned deck (completion rate, average retention)
@@ -68,12 +68,12 @@ FR49: Team admins can send a reminder to members who have not started an assigne
 FR50: Admin can toggle the global AI free-tier spend approval flag without a code deployment
 FR51: The system presents a cookie consent banner to new visitors and applies their preference
 FR52: The system rate-limits team invite sends to prevent abuse
-FR53: All core user-facing screens conform to WCAG 2.1 AA accessibility standards
+FR53: All core user-facing screens conform to WCAG 2.1 AA accessibility standards (cold start deck, onboarding/signup, study session, deck library, deck detail, AI generation flow, account/billing settings, team workspace; admin dashboard excluded)
 FR54: The system logs errors, AI generation failures, and payment events in structured, machine-readable format
 FR55: Admin can access error logs and system health indicators to investigate and debug production issues
 FR56: Admin can query, filter, and export error logs by type, time range, and severity
 FR57: The system groups and deduplicates recurring errors to surface patterns rather than noise
-FR58: The system tracks key product events (cold start viewed, signup, deck created, AI generation used, study session completed, paywall hit, upgrade, team created, deck assigned, session started)
+FR58: The system tracks key product events (cold_start_viewed, signup, deck_created, ai_generation_used, study_session_started, study_session_completed, paywall_hit, upgrade, team_created, deck_assigned)
 FR59: Admin can view a business metrics dashboard covering active users, retention cohorts (D1/D7/D30), freemium-to-paid conversion rate, and MRR
 FR60: Admin can view funnel analytics from cold start → signup → first deck → first study session → upgrade
 FR61: Admin can view AI usage metrics (generations per day, free vs. paid split, cost estimate)
@@ -108,7 +108,7 @@ NFR-REL2: Structured JSON logs retained minimum 30 days
 NFR-REL3: Critical errors (payment failures, auth failures) alert within 5 minutes
 NFR-REL4: Automatic failover to gpt-4o fallback if primary Azure deployment unavailable
 NFR-REL5: Zero tolerance for study session data loss — persisted before UI confirms completion
-NFR-REL6: Idempotent Stripe webhook handlers with dead-letter queue for failed events
+NFR-REL6: Idempotent Stripe webhook handlers (via `processed_webhook_events` table deduplication); Stripe's native retry (exponential backoff up to 72 hours) is the retry mechanism; no custom DLQ required
 NFR-ACC1: WCAG 2.1 AA on all core flows (study session, deck creation, onboarding, team management)
 NFR-ACC2: Full keyboard accessibility on all interactive elements
 NFR-ACC3: Semantic HTML; ARIA labels on dynamic content
@@ -125,7 +125,7 @@ NFR-INT5: App remains functional (read-only study mode) if Stripe or Resend temp
 **From Architecture — Technical Setup:**
 - ARCH1: Project scaffolded via `npx create-next-app@latest flashcards --typescript --tailwind --eslint --app --src-dir --import-alias "@/*" --turbopack`
 - ARCH2: Supabase project created in Frankfurt (EU) region with anonymous sign-ins enabled and `max_slot_wal_keep_size` configured
-- ARCH3: Azure OpenAI resource created in Sweden Central (EU Data Zone) with three deployments: gpt-4o-mini (FAST), gpt-5.4-mini (LARGE), gpt-4o (FALLBACK)
+- ARCH3: Azure OpenAI resource created in Sweden Central (EU Data Zone) with three deployments: gpt-4o-mini (FAST), gpt-4.1 (LARGE), gpt-4o (FALLBACK)
 - ARCH4: Drizzle ORM configured with `casing: 'camelCase'` in `drizzle.config.ts`
 - ARCH5: All DB interactions through typed DAL wrapper functions in `src/server/db/queries/` — no raw Drizzle in components or route handlers
 - ARCH6: Supabase RLS policies defined as SQL files in `supabase/migrations/rls/` (version-controlled)
@@ -139,7 +139,7 @@ NFR-INT5: App remains functional (read-only study mode) if Stripe or Resend temp
 - ARCH14: Cursor-based pagination from day one for all list queries: `{ limit, cursor? }` in, `{ items, nextCursor }` out
 - ARCH15: Anonymous user GDPR cleanup — Supabase Edge Function cron job to purge unconverted anonymous sessions
 - ARCH16: `axe-playwright` added to E2E suite for automated WCAG 2.1 AA checks
-- ARCH17: AI model routing in `src/server/ai/index.ts`: short generation → gpt-4o-mini, large doc → gpt-5.4-mini, fallback → gpt-4o
+- ARCH17: AI model routing in `src/server/ai/index.ts`: short generation → gpt-4o-mini, large doc → gpt-4.1, fallback → gpt-4o
 
 ### UX Design Requirements
 
@@ -204,7 +204,7 @@ FR54 → Epic 9 — Structured error, AI failure, and payment event logging
 FR55 → Epic 9 — Admin error log access + system health view
 FR56 → Epic 9 — Admin error log query, filter, and export
 FR57 → Epic 9 — Error grouping and deduplication
-FR58 → Epic 9 — Product event tracking (cold start, signup, deck created, AI used, session started, session completed, paywall hit, upgrade, team created, deck assigned)
+FR58 → Epic 9 — Product event tracking (cold_start_viewed, signup, deck_created, ai_generation_used, study_session_started, study_session_completed, paywall_hit, upgrade, team_created, deck_assigned)
 FR59 → Epic 9 — Business metrics dashboard (DAU/WAU, retention cohorts D1/D7/D30, conversion, MRR)
 FR60 → Epic 9 — Funnel analytics (cold start → signup → first deck → first study → upgrade)
 FR61 → Epic 9 — AI usage metrics (generations/day, free vs paid, cost estimate)
@@ -286,7 +286,7 @@ So that all subsequent development has a consistent, zero-tech-debt foundation.
 **And** Sentry is integrated with critical alert rules for payment and auth failures (within 5 min threshold)
 **And** `axe-playwright` is added to the E2E test suite for automated WCAG 2.1 AA checks
 **And** `.env.example` documents all required environment variables with comments
-**And** `src/server/ai/index.ts` exports the AI model routing logic (fast → gpt-4o-mini, large → gpt-5.4-mini, fallback → gpt-4o) via `@ai-sdk/azure`
+**And** `src/server/ai/index.ts` exports the AI model routing logic (fast → gpt-4o-mini, large → gpt-4.1, fallback → gpt-4o) via `@ai-sdk/azure`
 
 ### Story 1.2: Supabase Foundation & Auth Infrastructure
 
@@ -332,6 +332,7 @@ So that my privacy choices are respected and only consented cookies/analytics ar
 **Given** I have previously set a preference
 **When** I return to the site
 **Then** the banner is not shown and my stored preference is applied on load
+**And** the preference persists for 12 months (stored in localStorage with an expiry timestamp); after 12 months the banner re-appears
 
 **Given** the banner is visible
 **When** I interact with it using only the keyboard
@@ -346,10 +347,16 @@ So that I experience the product's core value before deciding to sign up.
 
 **Acceptance Criteria:**
 
+**Given** the database is seeded
+**When** `seed.sql` is run
+**Then** a cold start deck titled "5 Science-Backed Memory Techniques" exists with exactly 10 cards
+**And** the 10 cards include at least 2 cards of each `CardMode`: `qa`, `image`, and `context-narrative`
+**And** the deck is owned by a system user (not a real user account) and readable by anonymous sessions via RLS
+
 **Given** I land on the app homepage as a new anonymous visitor
 **When** the page loads
 **Then** an anonymous Supabase session is created automatically (no login required)
-**And** the pre-built cold start deck is visible and accessible
+**And** the cold start deck "5 Science-Backed Memory Techniques" is visible and accessible
 
 **Given** I click into the cold start deck
 **When** the study session starts
@@ -369,6 +376,11 @@ I want to sign up using Google OAuth or email/password,
 So that I can create a permanent account and access the full product.
 
 **Acceptance Criteria:**
+
+**Given** I am on the signup page
+**When** the form is displayed
+**Then** a Terms of Service acceptance checkbox is shown, including explicit age confirmation: "I confirm I am 13 or older and agree to the Terms of Service"
+**And** the signup submit button is disabled until the checkbox is checked
 
 **Given** I am on the signup page and click "Sign up with Google"
 **When** I complete Google OAuth consent
@@ -545,6 +557,7 @@ So that I can exercise my GDPR right to data portability.
 **When** I request a data export
 **Then** a data export job is queued
 **And** I receive an email acknowledgment within 5 minutes that the request is being processed
+**And** the 72-hour SLA clock starts at the time of the original request (not the acknowledgment email)
 
 **Given** the export is generated
 **When** it is ready (within 72 hours per NFR-GDPR2)
@@ -552,6 +565,11 @@ So that I can exercise my GDPR right to data portability.
 **And** the download contains: profile, decks, cards, FSRS review history, and Learning Fingerprint signals in JSON format
 **And** no payment card data is included (held by Stripe only, NFR-SEC8)
 **And** no AI prompt content or PII sent to Azure OpenAI is included (NFR-SEC6)
+
+**Given** the export job fails or times out (>72 hours)
+**When** the failure is detected
+**Then** the user receives an email notification that the export failed with an option to retry
+**And** the failure is logged as a structured error (FR54)
 
 ### Story 2.5: GDPR Personal Data Summary
 
@@ -563,7 +581,7 @@ So that I understand what personal data the system holds.
 
 **Given** I am on the privacy settings page
 **When** I request a data summary
-**Then** the summary is displayed in-app (or delivered by email within 72 hours)
+**Then** the summary is displayed in-app immediately
 **And** it lists all data categories: profile fields, decks, cards, study history, Learning Fingerprint signals, subscription tier, and active sessions
 **And** it explicitly states that payment card data is not stored by the app (managed by Stripe)
 
@@ -581,9 +599,11 @@ So that I can exercise my GDPR right to erasure.
 
 **Given** I type "DELETE" to confirm and submit
 **When** the request is processed
-**Then** my profile is soft-deleted immediately (`profiles.deleted_at` set)
+**Then** the following steps execute atomically (all succeed or all roll back):
+**And** my profile is soft-deleted immediately (`profiles.deleted_at` set)
 **And** my decks and notes are soft-deleted
 **And** my FSRS reviews are hard-deleted immediately
+**And** `profiles.user_fsrs_params`, `profiles.format_preferences`, and `profiles.previous_tier` are cleared (set to null) immediately
 **And** I am logged out and cannot log back in
 **And** a deletion confirmation email is sent immediately
 **And** full data erasure completes within 30 days (NFR-GDPR1)
@@ -683,7 +703,9 @@ So that I can remove decks I no longer need from my library.
 **When** it is processed
 **Then** the deck is soft-deleted (`decks.deleted_at` set) via the DAL
 **And** it disappears from my library view immediately
-**And** any shared invite links for this deck become invalid
+**And** any shared invite links for this deck become invalid (deck_shares rows cascade-deleted)
+**And** any team deck assignments for this deck are cascade-deleted (team_deck_assignments rows removed)
+**And** team members mid-session on this deck see a "This deck is no longer available" message on next card load
 
 **Given** the deck has active team assignments (from Epic 8)
 **When** I try to delete it
@@ -726,7 +748,12 @@ So that people I share it with can study it (requiring them to authenticate firs
 **Given** a recipient clicks the invite link
 **When** they are not authenticated
 **Then** they are prompted to log in or sign up
-**And** upon authentication, the deck is added to their accessible decks
+**And** upon authentication, the deck is added to their accessible decks as **read-only** — they can study it but cannot add, edit, or delete cards
+
+**Given** a recipient has a shared deck in their library
+**When** they view it
+**Then** card edit/delete controls are hidden
+**And** a "Shared by [owner display name]" label is shown
 
 **Given** the owner has deleted the deck
 **When** a recipient tries to access via the invite link
@@ -752,7 +779,13 @@ So that I can begin reviewing cards and building retention.
 **And** cards with a FSRS due date ≤ today are prioritized
 **And** new (unseen) cards are shown when no due cards remain
 
-**Given** I have a deck with no due cards and no new cards
+**Given** the deck has zero cards (empty deck)
+**When** I click "Study"
+**Then** the study session does not start
+**And** I am shown an informational message: "This deck has no cards yet — add cards to start studying"
+**And** I am given a CTA to add cards manually or generate with AI
+
+**Given** I have a deck with no due cards and no new cards (all cards scheduled for future)
 **When** I start a session
 **Then** I am shown an informational message indicating all cards are scheduled for future dates
 **And** I have the option to study all cards anyway (override mode)
@@ -767,8 +800,10 @@ So that cards are shown at the optimal interval for long-term retention.
 
 **Given** I am in an active study session and I rate a card
 **When** the rating is submitted
-**Then** the `scheduleCard()` wrapper in `src/server/fsrs/index.ts` is called with the card state, rating, and current timestamp
-**And** the card's FSRS state (stability, difficulty, due date) is updated in the `reviews` table via the DAL
+**Then** the `scheduleCard()` wrapper in `src/server/fsrs/index.ts` is called with the card state, effective rating, `responseTimeMs` (elapsed ms since card display), and current timestamp
+**And** if `responseTimeMs > HESITATION_THRESHOLD_MS` and the card state is Review, the rating is silently overridden to `Again` before scheduling
+**And** a `CardReview` entry (`cardId`, `rating`, `responseTimeMs`, `presentationMode`) is appended to the Zustand `reviews[]` buffer
+**And** the card's FSRS state (stability, difficulty, due date) is updated in the `reviews` table via the DAL on session completion
 **And** the card is not shown again in the current session after being rated
 
 **Given** I have cards with future due dates
@@ -811,9 +846,10 @@ So that I have a meaningful, cumulative measure of my retention quality for that
 **When** the session is persisted
 **Then** the Depth Score is recalculated and updated on the deck detail page
 
-**Given** I have not yet studied any cards in the deck
+**Given** I have not yet studied any cards in the deck (all cards in FSRS `New` state)
 **When** I view the deck
-**Then** the Depth Score shows as 0 or "Not started"
+**Then** the Depth Score widget is hidden (not shown as 0 — avoids false "0% retention" framing)
+**And** a "Start studying to see your score" prompt is shown in its place
 
 ### Story 4.5: Weak Card Isolation Study Mode
 
@@ -825,7 +861,7 @@ So that I can efficiently target knowledge gaps without reviewing cards I alread
 
 **Given** I am on the detail page of a deck I have studied
 **When** I click "Study weak cards"
-**Then** a study session is started containing only cards with FSRS retrievability below 0.70
+**Then** a study session is started containing only cards with FSRS retrievability below `WEAK_CARD_THRESHOLD` (0.70)
 **And** the session follows the standard study loop (Story 4.3)
 
 **Given** all cards in the deck are above the weak threshold
@@ -884,6 +920,11 @@ So that I can create a complete study deck in seconds without manual effort.
 **Then** the fallback model (`gpt-4o`) is attempted automatically (NFR-INT1)
 **And** if both fail, the user is shown a clear error message with a retry option
 
+**Given** the AI returns zero valid cards (empty result or all cards failed content validation)
+**When** the generation completes
+**Then** the user sees "No cards were generated — please try a different prompt" with a retry option
+**And** the free-tier usage credit is NOT decremented
+
 ### Story 5.2: AI Card Generation from Pasted Text
 
 As an authenticated user,
@@ -906,6 +947,10 @@ So that I can turn notes, articles, or study material into cards instantly.
 **When** I try to generate
 **Then** a validation error is shown before any AI call is made
 
+**Given** the AI returns zero valid cards
+**When** generation completes
+**Then** a clear message is shown and the free-tier credit is NOT decremented
+
 ### Story 5.3: Review, Edit & Delete AI-Generated Cards Before Saving
 
 As an authenticated user,
@@ -922,7 +967,8 @@ So that I have full control over the quality of my deck content.
 
 **Given** I click "Save to deck"
 **When** the action is confirmed
-**Then** only the cards I kept (not deleted) are added to the deck via the DAL
+**Then** cards with empty front or back content are rejected with an inline validation error before save
+**And** only the cards I kept (not deleted) and with valid content are added to the deck via the DAL
 **And** the review screen is dismissed and I am returned to the deck detail page
 
 **Given** I delete all generated cards and click "Save"
@@ -931,6 +977,8 @@ So that I have full control over the quality of my deck content.
 **And** I can either add more content or cancel
 
 ### Story 5.4: Free-Tier AI Usage Limits & Admin Spend-Approval Gate
+
+> **Cross-epic dependency:** The admin spend-approval flag toggle UI is implemented in Story 9.9 (Epic 9). Story 5.4 enforcement logic can be implemented independently, but end-to-end testing of the flag-disabled path requires Story 9.9 to be complete.
 
 As a free-tier user,
 I want to understand my monthly AI generation limit and see a clear upgrade prompt when I've reached it,
@@ -941,6 +989,7 @@ So that I know what I get for free and how to unlock more.
 **Given** I am a free-tier user who has not reached the monthly limit
 **When** I use AI generation
 **Then** my usage count is decremented in the database via the DAL
+**And** the limit resets on the 1st of each calendar month (tracked via `ai_usage.reset_at`)
 
 **Given** I have reached the monthly AI generation limit
 **When** I try to generate
@@ -970,18 +1019,25 @@ So that my Learning Fingerprint builds over time without any action from me.
 
 **Acceptance Criteria:**
 
-**Given** I am in an active study session and complete a card rating
+**Given** I am an authenticated user in an active study session and complete a card rating
 **When** the rating is recorded
-**Then** the system also stores: card ID, rating value, response time (ms from card show to flip), card format shown, and timestamp — in the `learning_fingerprint_events` table via the DAL
-**And** no PII is included in any fingerprint record (NFR-SEC6)
+**Then** the system stores `presentation_mode` and `response_time_ms` in the `reviews` table row (via the DAL) — these are the raw Learning Fingerprint signals (FR30)
+**And** for Pro/Team users: `updateFormatPreferences(userId, tier, sessionResults)` updates `profiles.format_preferences` EMA on session completion
+**And** for Free users: `presentation_mode` and `response_time_ms` are still written to `reviews` for upgrade continuity, but `profiles.format_preferences` is never updated
 **And** no fingerprint data is visible in the study UI (silent collection)
+**And** no PII is included in any fingerprint record (NFR-SEC6)
 
-**Given** I have fewer than 10 rated events in my fingerprint
+**Given** a Pro/Team user has completed fewer than `FINGERPRINT_MIN_SESSIONS` (5) sessions
 **When** the fingerprint is queried
-**Then** a default/baseline fingerprint is returned
-**And** the default card format (text front/back) is used for presentation
+**Then** `format_preferences` is null or all modes equal `0.5` (default) — `getLearningSummary()` returns `'qa'` as the preferred mode
+
+**Given** I am an anonymous user in a study session
+**When** I rate a card
+**Then** `presentation_mode` and `response_time_ms` are NOT written to `reviews` — only FSRS card ratings are stored for anonymous sessions
 
 ### Story 6.2: Shapeshifter Cards — Adaptive Format Presentation
+
+> **Prerequisites:** Story 6.1 (signal collection running), Epic 4 stories (study session fully implemented), Story 5.1 (AI generation for card format biasing per FR31). Story 6.2 cannot be tested end-to-end without all three.
 
 As a user who has built sufficient study history,
 I want the app to present each card in the format best suited to how I learn,
@@ -989,9 +1045,9 @@ So that my study experience adapts to maximize my retention.
 
 **Acceptance Criteria:**
 
-**Given** I have >= 10 rated events in my Learning Fingerprint
+**Given** I am a Pro/Team user and have completed > 5 study sessions (the `FINGERPRINT_MIN_SESSIONS` threshold)
 **When** I start a study session
-**Then** each card's presentation format is selected by the Learning Fingerprint engine (text, image-first, or narrative/contextual)
+**Then** each card's presentation format is selected by the Learning Fingerprint engine (`qa`, `image`, or `context-narrative`) based on `profiles.format_preferences`
 **And** the format selection is not visible to me — I see only the card content
 
 **Given** my fingerprint shows consistently higher ratings on narrative-format cards than text-only
@@ -1018,10 +1074,11 @@ So that silent knowledge gaps are caught and scheduled for deeper review automat
 **When** the session ends
 **Then** the hesitation value is stored as a Learning Fingerprint signal via the DAL
 
-**Given** I have previously mastered a card (high FSRS stability) but my hesitation on it is > 2× my personal median hesitation time
-**When** the session data is processed
-**Then** the card's FSRS due date is adjusted to an earlier date (flagged for deeper review)
-**And** this scheduling override is logged for fingerprint analysis
+**Given** I am reviewing a card in FSRS `Review` state and my hesitation exceeds `HESITATION_THRESHOLD_MS` (10 seconds)
+**When** the rating is submitted
+**Then** the effective rating is silently overridden to `Again` (per `scheduleCard()` logic)
+**And** the overridden effective rating is stored in `reviews.rating` (post-override value)
+**And** this forces an earlier re-review interval without any visible indication to the user
 
 ---
 
@@ -1163,12 +1220,28 @@ So that I can onboard my team to the workspace quickly.
 **When** I paste a list of email addresses and click "Send invites"
 **Then** each email is validated for format before sending (FR44)
 **And** invalid emails are flagged inline for correction before any sends occur
-**And** the invite send is rate-limited via Vercel KV + Upstash (FR52)
+**And** the invite send is rate-limited via Vercel KV + Upstash: max 20 invites per admin per hour (FR52)
 
 **Given** all emails are valid and I confirm
 **When** the invites are sent
-**Then** each invitation is stored in the `pending_invites` table with an expiry timestamp (7 days)
+**Then** each invitation is stored in the `pending_invites` table with an expiry timestamp (`INVITE_EXPIRY_DAYS` = 7 days)
 **And** invitation emails are sent via Resend within 60 seconds (NFR-INT4)
+**And** if an email already has a pending invite for this team, the existing row is updated (new token, new expiry, `isRevoked = false`) — no duplicate row created, one fresh email sent
+
+**Given** an invited email bounces (mailbox full, domain invalid)
+**When** the bounce is received via Resend webhook
+**Then** the bounce is logged as a structured error (`action: 'email.invite.bounce'`)
+**And** the invite row remains in `pending_invites` (admin can re-send manually)
+
+**Given** I am the sole team admin and attempt to leave the workspace or delete my account
+**When** the action is submitted
+**Then** it is blocked with an error: "You are the only admin — promote another member before leaving"
+**And** the leave/deletion action is not executed
+
+**Given** a member is removed and the team drops below 3 active members
+**When** the removal is processed
+**Then** existing team features remain active (Stripe subscription is not affected mid-period)
+**And** new seat additions are allowed; a warning is shown that the minimum is 3 seats for new subscriptions
 
 ### Story 8.3: Email Invitation Delivery & Join Flow
 
@@ -1281,7 +1354,7 @@ So that all observability, analytics, and alerting capabilities rest on a reliab
 
 **Acceptance Criteria:**
 
-**Given** any tracked product event fires (cold_start_viewed, signup_completed, deck_created, ai_generation_used, session_started, session_completed, paywall_hit, upgrade_completed, team_created, deck_assigned)
+**Given** any tracked product event fires (cold_start_viewed, signup, deck_created, ai_generation_used, study_session_started, study_session_completed, paywall_hit, upgrade, team_created, deck_assigned)
 **When** the event occurs
 **Then** it is logged via `log()` in `src/lib/logger.ts` as structured JSON
 **And** the entry includes: `event_type`, `user_id` (if authenticated), `timestamp`, and event-specific metadata
@@ -1355,7 +1428,7 @@ So that business metrics and funnel analytics can be derived from them.
 
 **Acceptance Criteria:**
 
-**Given** any tracked event fires: `cold_start_viewed`, `signup_completed`, `deck_created`, `ai_generation_used`, `session_started`, `session_completed`, `paywall_hit`, `upgrade_completed`, `team_created`, `deck_assigned`
+**Given** any tracked event fires: `cold_start_viewed`, `signup`, `deck_created`, `ai_generation_used`, `study_session_started`, `study_session_completed`, `paywall_hit`, `upgrade`, `team_created`, `deck_assigned`
 **When** the event fires
 **Then** it is persisted to the `analytics_events` table (or equivalent logging sink) via the DAL
 **And** the record includes: `event_name`, `user_id`, `timestamp`, and event-specific metadata
@@ -1427,6 +1500,7 @@ So that I can test gated features without real payment and control AI cost expos
 **And** my session behaves as if I have that tier (UI gates and feature access match the simulated tier)
 **And** the simulated role is clearly labeled in the UI so I cannot confuse it with my real tier
 **And** the simulation does not modify my `profiles.tier` record — it applies to the current session only (FR10)
+**And** the simulation start and end are logged via `log()` as a structured event: `{ action: 'admin.simulate.start', adminId, simulatedTier, timestamp }`
 
 **Given** I toggle the "AI Free-Tier Enabled" flag to OFF
 **When** any free-tier user tries to use AI generation

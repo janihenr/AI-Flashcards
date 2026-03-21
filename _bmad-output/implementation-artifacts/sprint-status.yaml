@@ -1,0 +1,133 @@
+# generated: 2026-03-21
+# last_updated: 2026-03-21
+# project: Flashcards
+# project_key: NOKEY
+# tracking_system: file-system
+# story_location: {project-root}/_bmad-output/implementation-artifacts
+
+# STATUS DEFINITIONS:
+# ==================
+# Epic Status:
+#   - backlog: Epic not yet started
+#   - in-progress: Epic actively being worked on
+#   - done: All stories in epic completed
+#
+# Epic Status Transitions:
+#   - backlog → in-progress: Automatically when first story is created (via create-story)
+#   - in-progress → done: Manually when all stories reach 'done' status
+#
+# Story Status:
+#   - backlog: Story only exists in epic file
+#   - ready-for-dev: Story file created in stories folder
+#   - in-progress: Developer actively working on implementation
+#   - review: Ready for code review (via Dev's code-review workflow)
+#   - done: Story completed
+#
+# Retrospective Status:
+#   - optional: Can be completed but not required
+#   - done: Retrospective has been completed
+#
+# WORKFLOW NOTES:
+# ===============
+# - Epic transitions to 'in-progress' automatically when first story is created
+# - Stories can be worked in parallel if team capacity allows
+# - SM typically creates next story after previous one is 'done' to incorporate learnings
+# - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
+
+generated: 2026-03-21
+last_updated: 2026-03-21
+project: Flashcards
+project_key: NOKEY
+tracking_system: file-system
+story_location: "{project-root}/_bmad-output/implementation-artifacts"
+
+development_status:
+  # ─── Epic 1: Foundation & Cold Start Experience ───
+  epic-1: in-progress
+  1-1-project-scaffold-and-core-infrastructure-setup: ready-for-dev
+  1-2-supabase-foundation-and-auth-infrastructure: backlog
+  1-3-cookie-consent-banner-and-gdpr-consent-storage: backlog
+  1-4-anonymous-cold-start-deck-study: backlog
+  1-5-user-registration-google-oauth-and-email-password: backlog
+  1-6-anonymous-session-upgrade-to-registered-account: backlog
+  1-7-team-invite-link-signup: backlog
+  1-8-user-login-and-logout: backlog
+  epic-1-retrospective: optional
+
+  # ─── Epic 2: Account Management & GDPR ───
+  epic-2: backlog
+  2-1-profile-information-update: backlog
+  2-2-password-change: backlog
+  2-3-active-session-view-and-revocation: backlog
+  2-4-gdpr-personal-data-export: backlog
+  2-5-gdpr-personal-data-summary: backlog
+  2-6-account-deletion-request: backlog
+  epic-2-retrospective: optional
+
+  # ─── Epic 3: Deck & Card Library ───
+  epic-3: backlog
+  3-1-create-a-new-flashcard-deck: backlog
+  3-2-add-cards-to-a-deck-manually: backlog
+  3-3-edit-and-delete-individual-cards: backlog
+  3-4-delete-a-deck: backlog
+  3-5-personal-deck-library-view: backlog
+  3-6-share-deck-via-invite-link: backlog
+  epic-3-retrospective: optional
+
+  # ─── Epic 4: Study Sessions & Spaced Repetition ───
+  epic-4: backlog
+  4-1-start-a-study-session: backlog
+  4-2-fsrs-6-card-scheduling: backlog
+  4-3-recall-confidence-rating: backlog
+  4-4-depth-score-display: backlog
+  4-5-weak-card-isolation-study-mode: backlog
+  4-6-automatic-session-progress-persistence: backlog
+  epic-4-retrospective: optional
+
+  # ─── Epic 5: AI-Powered Card Generation ───
+  epic-5: backlog
+  5-1-ai-deck-generation-from-topic-prompt: backlog
+  5-2-ai-card-generation-from-pasted-text: backlog
+  5-3-review-edit-and-delete-ai-generated-cards-before-saving: backlog
+  5-4-free-tier-ai-usage-limits-and-admin-spend-approval-gate: backlog
+  epic-5-retrospective: optional
+
+  # ─── Epic 6: Adaptive Learning Engine ───
+  epic-6: backlog
+  6-1-learning-fingerprint-data-model-and-silent-signal-collection: backlog
+  6-2-shapeshifter-cards-adaptive-format-presentation: backlog
+  6-3-hesitation-time-signal-and-automatic-deep-review-scheduling: backlog
+  epic-6-retrospective: optional
+
+  # ─── Epic 7: Subscriptions & Billing ───
+  epic-7: backlog
+  7-1-subscription-tier-usage-limits-and-billing-history-view: backlog
+  7-2-free-to-pro-upgrade-via-stripe-checkout: backlog
+  7-3-team-subscription-purchase-and-management: backlog
+  7-4-subscription-cancellation: backlog
+  7-5-automatic-feature-access-enforcement-by-tier: backlog
+  epic-7-retrospective: optional
+
+  # ─── Epic 8: Team Workspaces ───
+  epic-8: backlog
+  8-1-create-team-workspace: backlog
+  8-2-invite-team-members-by-email: backlog
+  8-3-email-invitation-delivery-and-join-flow: backlog
+  8-4-assign-deck-to-team-members: backlog
+  8-5-team-member-assigned-deck-view-and-study: backlog
+  8-6-aggregate-study-progress-dashboard: backlog
+  8-7-send-study-reminder-to-inactive-members: backlog
+  epic-8-retrospective: optional
+
+  # ─── Epic 9: Admin, Observability & Analytics ───
+  epic-9: backlog
+  9-1-structured-event-and-error-logging-infrastructure: backlog
+  9-2-admin-error-log-access-and-system-health-view: backlog
+  9-3-error-log-query-filter-and-export: backlog
+  9-4-error-grouping-and-deduplication: backlog
+  9-5-product-event-tracking: backlog
+  9-6-business-metrics-dashboard: backlog
+  9-7-funnel-analytics-cold-start-to-upgrade: backlog
+  9-8-ai-usage-metrics-dashboard: backlog
+  9-9-admin-role-simulation-and-ai-spend-flag-control: backlog
+  epic-9-retrospective: optional

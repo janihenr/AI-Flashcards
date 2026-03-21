@@ -112,9 +112,9 @@ Why now: LLM capabilities have crossed a threshold where personalization at this
 
 Sofia is a 28-year-old UX designer in Helsinki learning Spanish for a trip to Buenos Aires in 4 months. She tried Duolingo but felt like she was playing a game, not learning. She tried Anki but abandoned it after 2 hours of setup. She has 10–15 minutes a day, usually on her commute.
 
-**Opening Scene:** Sofia finds Flashcards via a shared deck link from a friend. She opens it on her phone — no signup prompt, no onboarding tutorial. She sees a Spanish vocabulary deck and immediately starts studying. The cards adapt in format after a few swipes — some show images, one asks her to recall a phrase in context. She finishes the deck in 8 minutes.
+**Opening Scene:** Sofia finds Flashcards via a shared deck link from a friend. She opens it on her phone — no signup prompt, no onboarding tutorial. She sees the "5 Science-Backed Memory Techniques" cold start deck and immediately starts studying. The cards vary in format — some are Q&A, one is image-based, one frames the content as a real-world scenario. She finishes the deck in 8 minutes.
 
-**Rising Action:** She signs up (one click, Google auth). Her Learning Fingerprint has already started building from her cold start session. She asks the AI to generate a deck from "restaurant phrases for Argentina" — 20 cards appear in under 5 seconds. She edits two, deletes one. Her first AI-generated deck is live in under 3 minutes.
+**Rising Action:** She signs up (one click, Google auth). Her card progress from the cold start session carries over automatically. Her Learning Fingerprint begins building from this first authenticated session. She asks the AI to generate a deck from "restaurant phrases for Argentina" — 20 cards appear in under 5 seconds. She edits two, deletes one. Her first AI-generated deck is live in under 3 minutes.
 
 **Climax:** Two weeks later, at a coffee shop in real life, she uses a phrase she learned in the app and it works. The app's Depth Score shows she's retained 73% of her Spanish deck. She shares her progress card to Instagram.
 
@@ -128,7 +128,7 @@ Sofia is a 28-year-old UX designer in Helsinki learning Spanish for a trip to Bu
 
 Marcus signed up 3 weeks ago, built a deck for his AWS certification, studied for 4 days, then stopped. Life got busy. He feels guilty opening the app.
 
-**Opening Scene:** Marcus gets a nudge — not a streak-shame notification, but a "You've got 12 cards ready to review — takes about 6 minutes." No guilt trip. He opens the app.
+**Opening Scene:** Marcus opens the app after a few weeks away. No broken streak greets him, no guilt counter. The dashboard shows "12 cards ready to review — takes about 6 minutes."
 
 **Rising Action:** The review session is shorter than expected. The Depth Score shows he hasn't lost much — the FSRS-6 algorithm accounted for his break. He finishes the session, adds 3 new cards using AI generation from a paste of AWS documentation.
 
@@ -136,7 +136,7 @@ Marcus signed up 3 weeks ago, built a deck for his AWS certification, studied fo
 
 **Resolution:** Marcus re-engages. His retention is measurably better than his previous tool. He invites a colleague to study the same deck.
 
-**Capabilities revealed:** Re-engagement notifications (no shame framing), FSRS-6 gap-tolerant scheduling, Depth Score (no streak mechanics), AI card generation from pasted text, deck sharing/invite.
+**Capabilities revealed:** FSRS-6 gap-tolerant scheduling, Depth Score (no streak mechanics), AI card generation from pasted text, deck sharing/invite.
 
 ---
 
@@ -181,7 +181,7 @@ James just joined Priya's company. Day 1, he gets an email: "Your onboarding mat
 | Learning Fingerprint data collection | 1 |
 | Shapeshifter Cards (adaptive format) | 1 |
 | Depth Score (no streaks) | 1, 2, 4 |
-| Re-engagement notifications (shame-free) | 2 |
+| Re-engagement notifications (shame-free) | Phase 2 only |
 | Deck sharing / invite by link | 2 |
 | Team workspace + email list invite w/ validation | 3 |
 | Deck assignment to team members | 3, 4 |
@@ -195,8 +195,8 @@ James just joined Priya's company. Day 1, he gets an email: "Your onboarding mat
 ### Compliance & Regulatory
 
 - **GDPR (MVP):** Full compliance from day 1. Required: cookie consent banner, privacy policy, terms of service, right to data deletion (account + study data), data processing records. Supabase (EU region) as data processor satisfies data residency requirements.
-- **No COPPA/FERPA:** Platform targets adult learners; no K-12 or institutional student data handling.
-- **No age restriction:** Platform open to all ages; standard ToS acceptance on signup suffices.
+- **Minimum age 13+ (COPPA boundary):** Platform requires users to confirm they are 13 or older at signup (ToS checkbox: "I confirm I am 13 or older"). COPPA applies to under-13 only; the 13+ gate with ToS acceptance is the standard industry approach (used by Quizlet, Duolingo) and removes COPPA obligations without requiring parental consent flows. No K-12 institutional data handling.
+- **No FERPA:** Platform does not handle educational records on behalf of educational institutions.
 
 ### Accessibility
 
@@ -207,6 +207,7 @@ James just joined Priya's company. Day 1, he gets an email: "Your onboarding mat
 - **Deck sharing:** Invite-only (no public deck discovery at MVP). Eliminates content moderation risk for launch — no need for reporting, flagging, or review workflows at this stage.
 - **User-generated content:** Deck text and images stored in Supabase Storage; no public indexing.
 - **Data retention:** User data retained until account deletion; study history and Learning Fingerprint data deleted on request within 30 days (GDPR compliance).
+- **Anonymous session data:** Anonymous cold start sessions store only card ratings required for FSRS scheduling to function (legitimate interest — service delivery). Behavioral profiling signals (`presentation_mode`, `response_time_ms`) are written to `reviews` only after authentication and ToS acceptance — for all authenticated tiers including Free (stored for upgrade continuity). The Layer 2 Learning Fingerprint EMA (`profiles.format_preferences`) is updated only for Pro/Team users — Free users accumulate raw signals but format adaptation is not activated. Anonymous sessions not converted to accounts are purged by a scheduled Supabase Edge Function cron job.
 
 ### Technical Constraints
 
@@ -286,18 +287,19 @@ A web-first SaaS application serving two account contexts: individual consumer a
 | Role | Capabilities |
 |---|---|
 | Anonymous | Study cold start deck, view landing page |
-| Free User | Create decks (limited), study, manual cards, basic FSRS-6 |
-| Pro User | All Free + AI card generation (unlimited), AI-enhanced Learning Fingerprint |
+| Free User | Create decks, study, manual cards, FSRS-6 scheduling (Layer 1 Fingerprint — personalized scheduling only), AI card generation (limited — subject to monthly cap and admin spend-approval flag), all cards shown in `qa` mode |
+| Pro User | All Free + AI card generation (unlimited, no burst throttle), Layer 2 Fingerprint (format preference vector — adaptive card modes + AI prompt biasing), no burst throttle |
 | Team Member | All Pro + access to assigned team decks, team study progress (own) |
 | Team Admin | All Team Member + invite members, assign decks, view team progress, send reminders |
+| Admin (Developer) | `profiles.is_admin = true` — accesses `/admin/*` routes; error logs, business metrics, funnel analytics, AI usage dashboard, spend-approval flag toggle, role simulation; independent of subscription tier |
 
 ### Subscription Tiers
 
 | Tier | Price (TBD) | Limits |
 |---|---|---|
-| Free | $0 | Limited AI card generations/month (~10), manual cards unlimited |
-| Pro | ~$8–12/mo | Unlimited AI generation, full Learning Fingerprint, priority AI |
-| Team | ~$6–8/seat/mo | All Pro features + team workspace (min. 3 seats) |
+| Free | $0 | Limited AI card generations/month (10, `MAX_FREE_GENERATIONS`), manual cards unlimited, FSRS-6 scheduling, all cards in `qa` mode |
+| Pro | ~$8–12/mo | Unlimited AI generation, no burst throttle, Layer 2 Learning Fingerprint (adaptive card modes + AI prompt biasing) |
+| Team | ~$6–8/seat/mo | All Pro features + team workspace (min. 3 seats — enforced at Stripe checkout via minimum quantity; seat count entered during checkout flow) |
 
 *Exact pricing TBD — recommend A/B testing at launch.*
 
@@ -312,8 +314,9 @@ A web-first SaaS application serving two account contexts: individual consumer a
 
 | Integration | Purpose | MVP |
 |---|---|---|
-| Azure OpenAI (GPT-4o) | AI card generation, Learning Fingerprint adaptation | ✅ |
-| Gemini 2.5 Flash | Fallback LLM if Azure unavailable | ✅ |
+| Azure OpenAI (gpt-4o-mini) | Primary AI card generation (short prompts, ≤20 cards), Learning Fingerprint adaptation | ✅ |
+| Azure OpenAI (gpt-4.1) | Large document ingestion (1M context window) for long paste/PDF card generation | ✅ |
+| Azure OpenAI (gpt-4o, fallback deployment) | Fallback if primary deployment unavailable; same provider, same EU data zone, no second API key | ✅ |
 | Supabase | Database, auth, storage, RLS | ✅ |
 | Stripe | Subscription billing, webhook handling | ✅ |
 | Resend | Transactional email (invites, receipts, re-engagement) | ✅ |
@@ -371,7 +374,7 @@ A web-first SaaS application serving two account contexts: individual consumer a
 | Manual Card Creation | Fallback for users who prefer control |
 | FSRS-6 Spaced Repetition | Foundation of retention engine |
 | Learning Fingerprint data model | Must collect data from day 1; can't retrofit |
-| Shapeshifter Cards (text + image) | Minimum multi-modal expression of fingerprint |
+| Shapeshifter Cards (qa, image, context-narrative) | Multi-modal expression of Learning Fingerprint — all three CardModes supported at MVP |
 | Depth Score | Replaces streaks; core positioning vs. competitors |
 | Stripe (Free + Pro + Team tiers) | Revenue enablement; validates willingness to pay |
 | Team Workspace (invite by email list, assign decks, progress view) | B2B MVP; validates enterprise use case |
@@ -406,15 +409,15 @@ A web-first SaaS application serving two account contexts: individual consumer a
 | Technical | Solo-dev capacity overrun | Cut Phase 1 scope at Depth Score + team basic if timeline slips; AI generation is non-negotiable |
 | Market | Reverse paywall cannibalizes conversion | A/B test paywall placement; monitor AI usage depth vs. conversion rate |
 | Market | PMF not validated fast enough | Ship cold start deck + basic study loop first; AI + team can follow in sprint 2 |
-| Resource | Azure OpenAI costs spike unexpectedly | Admin spend toggle; per-user AI rate limiting; Gemini 2.5 Flash fallback |
+| Resource | Azure OpenAI costs spike unexpectedly | Admin spend toggle; per-user AI rate limiting; gpt-4o fallback deployment (same Azure resource, lower cost than primary) |
 
 ## Functional Requirements
 
 ### Discovery & Onboarding
 
-- **FR1:** Anonymous users can access and study a pre-built cold start deck without creating an account
+- **FR1:** Anonymous users can access and study a pre-built cold start deck without creating an account. The cold start deck topic is *"5 Science-Backed Memory Techniques"* — 10 cards, content-neutral and universally relevant to any learner. Cards demonstrate all three `CardMode` types (`qa`, `image`, `context-narrative`) to showcase the product's multi-format capability. Deck content is hardcoded in `seed.sql` and maintained by the developer.
 - **FR2:** Anonymous users can initiate account creation directly from within the cold start deck experience
-- **FR3:** Users can sign up using Google OAuth or email/password
+- **FR3:** Users can sign up using Google OAuth or email/password; signup requires acceptance of Terms of Service including confirmation of age 13 or older
 - **FR4:** Users invited to a team workspace can sign up using their work email via an invite link
 
 ### Authentication & Account Management
@@ -443,9 +446,9 @@ A web-first SaaS application serving two account contexts: individual consumer a
 - **FR20:** Users can start a study session for any deck they have access to
 - **FR21:** The system schedules card reviews using the FSRS-6 spaced repetition algorithm
 - **FR22:** Users can rate their recall confidence after each card, which drives FSRS-6 scheduling
-- **FR23:** Users can view their Depth Score — a cumulative measure of retention quality — per deck
+- **FR23:** Users can view their Depth Score per deck — defined as the mean FSRS-6 retrievability across all seen cards (state > 0), expressed as an integer percentage (0–100); cards never yet reviewed are excluded; returns null/hidden if no cards have been seen
 - **FR24:** Users can identify and study weak cards (low retention) in isolation within a deck
-- **FR25:** The system presents card content in adaptive formats (text, image, contextual narrative) based on the user's Learning Fingerprint
+- **FR25:** The system presents card content in adaptive formats (`qa`, `image`, `context-narrative`) based on the user's Learning Fingerprint format preference vector
 - **FR26:** Study session progress is persisted automatically on session completion
 
 ### AI & Personalization
@@ -453,18 +456,18 @@ A web-first SaaS application serving two account contexts: individual consumer a
 - **FR27:** Authenticated users can generate a deck from a topic prompt using AI
 - **FR28:** Authenticated users can generate cards from pasted text using AI
 - **FR29:** Users can review, edit, and delete AI-generated cards before saving to a deck
-- **FR30:** The system silently builds a Learning Fingerprint for each user based on study behavior and response patterns
-- **FR31:** The Learning Fingerprint influences card format selection and content presentation style over time
+- **FR30:** The system silently builds a Learning Fingerprint for authenticated users only (never for anonymous sessions) in two layers: (1) **Layer 1 — all authenticated users:** FSRS-6 scheduling parameters (`user_fsrs_params`) that adapt when cards are shown; (2) **Layer 2 — Pro/Team users only:** a format preference vector (`profiles.format_preferences`) tracking engagement rate per card mode (`qa`, `image`, `context-narrative`) as an EMA, updated on every session completion. Free users always see cards in `qa` mode; `presentation_mode` and `response_time_ms` are still written to `reviews` for Free users (to enable future upgrade continuity) but `format_preferences` is not updated. Anonymous sessions store only card ratings for FSRS scheduling; no fingerprint signals are written.
+- **FR31:** For Pro/Team users, the Layer 2 format preference vector determines card mode at study time (highest-scoring mode used) and biases AI card generation toward the preferred style; Free users are locked to `qa` mode regardless of session history; new Pro users default to `qa` mode until >5 sessions have accumulated
 - **FR32:** AI card generation for free-tier users is subject to a monthly usage limit
 - **FR33:** AI card generation for free-tier users requires an admin spend-approval flag to be enabled
 - **FR34:** The system sanitizes and validates all user-supplied content before passing it to AI generation
-- **FR35:** Before AI deck generation, the system prompts users to specify their learning goal and personal context (what, why, and timeline); AI-generated card content is framed through that stated goal
-- **FR36:** The system measures and logs response hesitation time (elapsed time between card display and user interaction) as a Learning Fingerprint signal; sustained hesitation on nominally mastered cards automatically schedules them for deeper review
+- **FR35:** Before AI deck generation, the system prompts users to specify their learning goal and personal context (what, why, and timeline); AI-generated card content is framed through that stated goal; the learning goal affects **AI generation only** — it does not alter FSRS scheduling parameters or retention targets
+- **FR36:** The system measures response hesitation time per card (elapsed milliseconds from card display to rating tap, stored in `reviews.response_time_ms`); when hesitation exceeds 10 seconds (`HESITATION_THRESHOLD_MS`) on a card with FSRS state = Review (nominally mastered), the system silently overrides the user's rating to `Again`, forcing a shorter re-review interval — the override is transparent to the user
 
 ### Payments & Subscriptions
 
 - **FR37:** Users can upgrade from Free to Pro tier via a subscription checkout flow
-- **FR38:** Team admins can purchase and manage a Team subscription
+- **FR38:** Team admins can purchase and manage a Team subscription; the Stripe checkout session enforces a minimum quantity of 3 seats (`quantity: Math.max(seatCount, 3)`) — the UI prevents selecting fewer than 3
 - **FR39:** Users can view their current subscription tier, remaining usage limits, and billing history
 - **FR40:** Users can cancel their subscription at any time
 - **FR41:** The system automatically grants and revokes feature access based on the user's active subscription tier
@@ -474,7 +477,7 @@ A web-first SaaS application serving two account contexts: individual consumer a
 - **FR42:** Authenticated users can create a named team workspace
 - **FR43:** Team admins can invite members by providing a list of email addresses
 - **FR44:** The system validates each email address in the invite list and flags invalid entries before sending invitations
-- **FR45:** Invited users receive an email invitation with a link to sign up or log in and join the workspace
+- **FR45:** Invited users receive an email invitation with a link to sign up or log in and join the workspace; upon accepting the invite, the user's `profiles.tier` is set to `team_member` (or `team_admin` if designated), superseding any existing individual Pro subscription for the duration of team membership; users who previously held an individual Pro subscription see a UI notice: "You've joined a team workspace — your team subscription now covers your access. Your individual Pro subscription is still active and will continue to be charged. Cancel it in billing settings if you no longer need it." Individual Pro subscription is not cancelled automatically — the user manages it via their billing settings.
 - **FR46:** Team admins can assign a deck to all or selected team members
 - **FR47:** Team members can view and study all decks assigned to them
 - **FR48:** Team admins can view aggregate study progress per assigned deck (completion rate, average retention)
@@ -482,15 +485,15 @@ A web-first SaaS application serving two account contexts: individual consumer a
 
 ### Administration & Compliance
 
-- **FR50:** Admin can toggle the global AI free-tier spend approval flag without a code deployment
+- **FR50:** Admin (`profiles.is_admin = true`) can toggle the global AI free-tier spend approval flag without a code deployment; all admin capabilities (FR50, FR55–FR61) are gated behind `is_admin` enforced in middleware and Server Actions
 - **FR51:** The system presents a cookie consent banner to new visitors and applies their preference
 - **FR52:** The system rate-limits team invite sends to prevent abuse
-- **FR53:** All core user-facing screens conform to WCAG 2.1 AA accessibility standards
+- **FR53:** All core user-facing screens conform to WCAG 2.1 AA accessibility standards; "core screens" are: cold start deck, onboarding/signup, study session, deck library, deck detail, AI generation flow, account/billing settings, and team workspace (admin dashboard screens are functional but not required to meet AA)
 - **FR54:** The system logs errors, AI generation failures, and payment events in structured, machine-readable format (action context, user role, stack trace, timestamps) to enable automated analysis
 - **FR55:** Admin can access error logs and system health indicators to investigate and debug production issues
 - **FR56:** Admin can query, filter, and export error logs by type, time range, and severity
 - **FR57:** The system groups and deduplicates recurring errors to surface patterns rather than noise
-- **FR58:** The system tracks key product events (cold start viewed, signup, deck created, AI generation used, study session completed, paywall hit, upgrade, team created, deck assigned)
+- **FR58:** The system tracks key product events using canonical `AppEvent` names: `cold_start_viewed`, `signup`, `deck_created`, `ai_generation_used`, `study_session_started`, `study_session_completed`, `paywall_hit`, `upgrade`, `team_created`, `deck_assigned`
 - **FR59:** Admin can view a business metrics dashboard covering active users, retention cohorts (D1/D7/D30), freemium-to-paid conversion rate, and MRR
 - **FR60:** Admin can view funnel analytics from cold start → signup → first deck → first study session → upgrade
 - **FR61:** Admin can view AI usage metrics (generations per day, free vs. paid split, cost estimate)
@@ -548,12 +551,15 @@ A web-first SaaS application serving two account contexts: individual consumer a
 
 | Requirement | Target |
 |---|---|
-| Uptime | ≥ 99.5% monthly (Vercel + Supabase SLA covers this) |
-| Error logging | Structured JSON logs with context; retained for minimum 30 days |
-| Error alerting | Critical errors (payment failures, auth failures) alert within 5 minutes |
-| AI fallback | Automatic failover to Gemini 2.5 Flash if Azure OpenAI unavailable |
-| Study session data loss | Zero tolerance — session results persisted before UI confirms completion |
-| Stripe webhook reliability | Idempotent webhook handlers; retry on failure; dead-letter queue for failed events |
+| Uptime | ≥ 99.5% monthly (Vercel + Supabase SLA covers this); study session reads and writes must remain functional even if Stripe is down |
+| API error rate | < 1% of non-AI requests return 5xx errors per rolling hour; AI generation endpoints excluded (higher expected error rate due to model availability) |
+| Error logging | Structured JSON logs with context; retained minimum 30 days, maximum 90 days (rotation); no PII in any log entry |
+| Error alerting | Critical errors (payment failures, auth failures) alert within 5 minutes via Sentry |
+| AI fallback | Automatic failover to Azure gpt-4o (fallback deployment, same resource) if primary Azure deployment unavailable; AI fallback SLA: ≤ 30s total end-to-end before user sees error |
+| Study session data loss | Zero tolerance — session results persisted before UI confirms completion; tab-close partial saves are best-effort (browser sendBeacon constraint) |
+| Stripe webhook reliability | Idempotent webhook handlers (via `processed_webhook_events` table); Stripe's native retry (exponential backoff, up to 72 hours) serves as the retry mechanism |
+| Backup & recovery | Supabase managed daily backups (Point-In-Time Recovery, Frankfurt region); RTO target: 4 hours; RPO target: 24 hours; no custom backup infrastructure at MVP |
+| Data retention | Error logs: 30–90 days; anonymous session data: 30 days unconverted; Learning Fingerprint (format_preferences): indefinite (personal data, deleted on GDPR request); analytics_events: indefinite (pseudonymous, no PII) |
 
 ### Accessibility
 
@@ -569,7 +575,7 @@ A web-first SaaS application serving two account contexts: individual consumer a
 
 | Integration | Requirement |
 |---|---|
-| Azure OpenAI / Gemini | Timeout after 10s; retry once; fallback to secondary model; user notified if both fail |
+| Azure OpenAI (primary + fallback deployments) | Timeout after 10s; retry once on primary; fallback to gpt-4o deployment; user notified if fallback also fails |
 | Stripe | Webhook signature validation on all events; idempotency keys on all payment operations |
 | Supabase | Connection pooling via Supabase Pooler; no direct DB connections from serverless functions |
 | Resend (email) | Transactional emails delivered within 60s; bounce handling logged |

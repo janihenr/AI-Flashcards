@@ -44,7 +44,7 @@ Core architectural demands: cold start anonymous experience with auth transition
 - **Stack locked** — Next.js App Router + Supabase + Vercel + Stripe + Azure OpenAI (all LLM calls) + Resend
 - **AI models** — Azure OpenAI, Sweden Central region (EU Data Zone, only EU region supporting GPT-5 series):
   - `gpt-4o-mini` — card generation (fast, cheap, structured output)
-  - `gpt-5.4-mini` — long document ingestion (400K context)
+  - `gpt-4.1` — long document ingestion (1M context)
   - `gpt-4o` — fallback if primary deployment unavailable
   - `gpt-4o-mini-tts` + `gpt-4o-transcribe` — Phase 2 audio cards
 - **ORM** — Drizzle (type-safe, edge-friendly, SQL-close)
@@ -57,7 +57,7 @@ Core architectural demands: cold start anonymous experience with auth transition
 
 1. **Authentication & RBAC** — 5-tier role model enforced via Supabase RLS across every data access; subscription state must stay in sync with role grants
 2. **GDPR compliance** — Touches auth, storage, AI pipeline, analytics, and deletion/export flows; must be designed in, not bolted on
-3. **AI cost control** — Per-user rate limiting, admin spend toggle, tier-based access, and Azure→Gemini fallback span auth, AI pipeline, and admin layers
+3. **AI cost control** — Per-user rate limiting, admin spend toggle, tier-based access, and Azure primary→fallback deployment routing span auth, AI pipeline, and admin layers
 4. **Study data integrity** — Zero data loss on session completion; local state sync pattern required (offline-tolerant write)
 5. **Cold start → auth handoff** — Anonymous session state (Learning Fingerprint signals, deck progress) must transfer to authenticated user without friction
 6. **Runtime configuration** — Feature flags (`ai_free_tier_enabled`, future A/B flags) must be mutable without deployment via Supabase `system_config` table
@@ -119,9 +119,11 @@ Not included by default — Vitest + Playwright added as first-story dependency
 3. ts-fsrs (`pnpm add ts-fsrs`)
 4. Stripe (`pnpm add stripe @stripe/stripe-js`)
 5. Resend (`pnpm add resend`)
-6. shadcn/ui (`npx shadcn@latest init`)
-7. Vitest + Playwright (testing)
-8. Zod (`pnpm add zod`) — already peer dep of AI SDK
+6. Rate limiting (`pnpm add @upstash/ratelimit @vercel/kv`) — auth brute-force + AI burst throttle + team invite limits
+7. shadcn/ui (`npx shadcn@latest init`)
+8. Framer Motion (`pnpm add framer-motion`) — card flip animation only; no other use
+9. Vitest + Playwright (testing)
+10. Zod (`pnpm add zod`) — already peer dep of AI SDK
 
 **Note:** Project initialization using this command is the first implementation story.
 
@@ -153,12 +155,287 @@ Not included by default — Vitest + Playwright added as first-story dependency
 **Schema Design** — `decks → notes → cards → reviews` hierarchy.
 Separate content (notes) from scheduling state (cards). One note generates multiple cards per modality, each with an independent FSRS-6 schedule.
 
-Supporting tables:
-- `profiles` — user tier, display name, GDPR consent state
-- `user_fsrs_params` — 21-weight array per user (Learning Fingerprint)
-- `system_config` — runtime feature flags (`ai_free_tier_enabled`, etc.)
-- `teams`, `team_members` — lightweight multi-tenancy
-- `ai_usage` — per-user monthly generation count for free tier enforcement
+**`decks` table schema (`src/server/db/schema/decks.ts`):**
+```typescript
+export const decks = pgTable('decks', {
+  id:          uuid('id').primaryKey().defaultRandom(),
+  userId:      uuid('user_id').notNull().references(() => profiles.id, { onDelete: 'cascade' }),
+  title:       text('title').notNull(),
+  subject:     text('subject'),
+  shareToken:  text('share_token').unique(),  // URL-safe random token; null = not shared; generated on first share click
+  deletedAt:   timestamp('deleted_at', { withTimezone: true }),
+  createdAt:   timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+})
+// Indexes: idx_decks_user_deleted (userId, deletedAt) — soft-delete filtered library query
+// Share token: UUID v4, generated on demand, does NOT expire (revoked by deck deletion)
+// RLS: owner full access; shared readers via deck_shares; team members via team_deck_assignments
+
+// notes — one note per card concept (content layer, separate from scheduling)
+export const notes = pgTable('notes', {
+  id:          uuid('id').primaryKey().defaultRandom(),
+  deckId:      uuid('deck_id').notNull().references(() => decks.id, { onDelete: 'cascade' }),
+  userId:      uuid('user_id').notNull().references(() => profiles.id, { onDelete: 'cascade' }),
+  content:     text('content').notNull(),
+  deletedAt:   timestamp('deleted_at', { withTimezone: true }),
+  createdAt:   timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+})
+```
+
+**`deck_shares` table — shared deck access control (`src/server/db/schema/decks.ts`):**
+```typescript
+export const deckShares = pgTable('deck_shares', {
+  id:        uuid('id').primaryKey().defaultRandom(),
+  deckId:    uuid('deck_id').notNull().references(() => decks.id, { onDelete: 'cascade' }),
+  userId:    uuid('user_id').notNull().references(() => profiles.id, { onDelete: 'cascade' }),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+}, (t) => ({ uniq: unique().on(t.deckId, t.userId) }))
+// One row per (deck, recipient). RLS: recipient can SELECT the deck; cannot INSERT/UPDATE/DELETE cards or notes.
+// Deck owner soft-deletes deck → deck_shares rows cascade-deleted → recipients lose access immediately.
+// Share token on decks table is used to add a row here on claim; token itself never expires (only revoked via deck deletion).
+```
+
+**`team_deck_assignments` table (`src/server/db/schema/teams.ts`):**
+```typescript
+export const teamDeckAssignments = pgTable('team_deck_assignments', {
+  id:         uuid('id').primaryKey().defaultRandom(),
+  teamId:     uuid('team_id').notNull().references(() => teams.id, { onDelete: 'cascade' }),
+  deckId:     uuid('deck_id').notNull().references(() => decks.id, { onDelete: 'cascade' }),
+  userId:     uuid('user_id').notNull().references(() => profiles.id, { onDelete: 'cascade' }),
+  assignedAt: timestamp('assigned_at', { withTimezone: true }).notNull().defaultNow(),
+}, (t) => ({ uniq: unique().on(t.teamId, t.deckId, t.userId) }))
+// Soft-delete of deck cascades assignment deletion; team member removed → their assignment row deleted
+// RLS: team member can read their own assignments; team admin can read all; owner full CRUD
+```
+
+**`pending_invites` schema update — add revocation support:**
+```typescript
+// (add to pending_invites table defined in Supporting tables section)
+isRevoked: boolean('is_revoked').notNull().default(false),  // true = admin revoked before acceptance
+// Invite is only valid if: usedAt IS NULL AND isRevoked = false AND expiresAt > now()
+// Re-invite logic: UPDATE pending_invites SET token = newToken, expiresAt = newExpiry, isRevoked = false
+//   WHERE teamId = ? AND email = ? — prevents duplicate rows (unique(teamId, email) constraint)
+```
+
+**Learning goal persistence:**
+```typescript
+// Not persisted anywhere — session-scoped only; passed directly to AI prompt; discarded after generation
+// NOT included in GDPR data export or data summary (it is ephemeral request context, not stored personal data)
+// NOT logged in structured logs (it may contain sensitive personal intent; only sanitized card output is retained)
+// If user wants to "remember" a goal, they must re-enter it on next generation — intentional (goals change per session)
+```
+
+**Canonical `cards` table schema (`src/server/db/schema/cards.ts`):**
+```typescript
+import { pgTable, uuid, text, integer, real, timestamp, pgEnum } from 'drizzle-orm/pg-core'
+import { notes } from './notes'
+import { profiles } from './users'
+
+export const cardModeEnum = pgEnum('card_mode', ['qa', 'image', 'context-narrative'])
+
+export const cards = pgTable('cards', {
+  id:               uuid('id').primaryKey().defaultRandom(),
+  noteId:           uuid('note_id').notNull().references(() => notes.id, { onDelete: 'cascade' }),
+  userId:           uuid('user_id').notNull().references(() => profiles.id, { onDelete: 'cascade' }),
+  mode:             cardModeEnum('mode').notNull().default('qa'),
+
+  // Card content — mode-specific fields are nullable
+  frontContent:     text('front_content').notNull(),
+  backContent:      text('back_content').notNull(),
+  narrativeContext: text('narrative_context'),   // non-null only when mode = 'context-narrative'
+  imageUrl:         text('image_url'),           // non-null only when mode = 'image'
+
+  // FSRS-6 scheduling state (managed by ts-fsrs)
+  stability:        real('stability').notNull().default(0),
+  difficulty:       real('difficulty').notNull().default(0),
+  elapsedDays:      integer('elapsed_days').notNull().default(0),
+  scheduledDays:    integer('scheduled_days').notNull().default(0),
+  reps:             integer('reps').notNull().default(0),
+  lapses:           integer('lapses').notNull().default(0),
+  state:            integer('state').notNull().default(0),  // FSRS State enum: New=0, Learning=1, Review=2, Relearning=3
+  due:              timestamp('due', { withTimezone: true }).notNull().defaultNow(),
+
+  createdAt:        timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  updatedAt:        timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+})
+// Indexes: idx_cards_user_due (userId, due) — primary study session query
+// Hard-delete only (no soft-delete on cards — see Soft-Delete Pattern below)
+```
+
+**Canonical `reviews` table schema (`src/server/db/schema/reviews.ts`):**
+```typescript
+export const reviews = pgTable('reviews', {
+  id:              uuid('id').primaryKey().defaultRandom(),
+  cardId:          uuid('card_id').notNull().references(() => cards.id, { onDelete: 'cascade' }),
+  userId:          uuid('user_id').notNull().references(() => profiles.id, { onDelete: 'cascade' }),
+  rating:          integer('rating').notNull(),           // FSRS Rating enum: Again=1, Hard=2, Good=3, Easy=4
+  presentationMode: cardModeEnum('presentation_mode').notNull(),
+  responseTimeMs:  integer('response_time_ms').notNull(), // elapsed ms from card display to rating tap
+  reviewedAt:      timestamp('reviewed_at', { withTimezone: true }).notNull().defaultNow(),
+})
+// Hard-delete only (no soft-delete on reviews)
+// Index: idx_reviews_user_reviewed_at (userId, reviewedAt) — for getLearningSummary aggregation
+```
+
+**`CardMode` type** — canonical definition exported from `src/types/index.ts`:
+```typescript
+export type CardMode = 'qa' | 'image' | 'context-narrative'
+// qa:                front = question text, back = answer text
+// image:             front = image (imageUrl required), back = label/explanation text
+// context-narrative: front = scenario/story framing card content (narrativeContext required), back = answer/resolution
+```
+All code importing `CardMode` does so from `@/types`, never from the schema file directly.
+
+Supporting tables — canonical schemas:
+
+```typescript
+// profiles (extended columns beyond Supabase auth.users)
+export const profiles = pgTable('profiles', {
+  id:               uuid('id').primaryKey().references(() => authUsers.id, { onDelete: 'cascade' }),
+  displayName:      text('display_name'),
+  tier:             text('tier').notNull().default('free'),       // 'anonymous'|'free'|'pro'|'team_member'|'team_admin'
+  previousTier:     text('previous_tier'),                        // nullable — stores tier before team join
+  isAdmin:          boolean('is_admin').notNull().default(false),
+  formatPreferences: jsonb('format_preferences'),                  // FormatPreferences | null (Layer 2)
+  userFsrsParams:   jsonb('user_fsrs_params'),                    // number[21] | null (Layer 1 — ts-fsrs managed)
+  gdprConsentAt:    timestamp('gdpr_consent_at', { withTimezone: true }),
+  deletedAt:        timestamp('deleted_at', { withTimezone: true }),
+  createdAt:        timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+})
+
+// system_config — singleton table (one row; id = 'global')
+export const systemConfig = pgTable('system_config', {
+  id:                  text('id').primaryKey().default('global'),
+  aiFreeeTierEnabled:  boolean('ai_free_tier_enabled').notNull().default(true),
+  updatedAt:           timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  updatedBy:           uuid('updated_by').references(() => profiles.id),  // admin user who last changed flag
+})
+// RLS: SELECT public (cached via unstable_cache); UPDATE admin only (is_admin = true)
+
+// ai_usage — per-user monthly generation counter
+export const aiUsage = pgTable('ai_usage', {
+  id:           uuid('id').primaryKey().defaultRandom(),
+  userId:       uuid('user_id').notNull().references(() => profiles.id, { onDelete: 'cascade' }),
+  monthStart:   date('month_start').notNull(),     // '2025-01-01' — 1st of calendar month (UTC)
+  count:        integer('count').notNull().default(0),
+}, (t) => ({ uniq: unique().on(t.userId, t.monthStart) }))
+// Increment is atomic: UPDATE ai_usage SET count = count + 1 WHERE userId = ? AND monthStart = ? AND count < MAX_FREE_GENERATIONS
+// Returns affected rows — 0 means limit already reached (optimistic lock pattern, no race condition)
+// Monthly reset: new row inserted on first use of new month; old rows never deleted (audit trail)
+
+// teams
+export const teams = pgTable('teams', {
+  id:          uuid('id').primaryKey().defaultRandom(),
+  name:        text('name').notNull(),
+  ownerId:     uuid('owner_id').notNull().references(() => profiles.id),
+  createdAt:   timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+})
+
+// team_members — join table; unique per (userId, teamId)
+export const teamMembers = pgTable('team_members', {
+  id:       uuid('id').primaryKey().defaultRandom(),
+  teamId:   uuid('team_id').notNull().references(() => teams.id, { onDelete: 'cascade' }),
+  userId:   uuid('user_id').notNull().references(() => profiles.id, { onDelete: 'cascade' }),
+  role:     text('role').notNull(),   // 'team_member' | 'team_admin'
+  joinedAt: timestamp('joined_at', { withTimezone: true }).notNull().defaultNow(),
+}, (t) => ({ uniq: unique().on(t.teamId, t.userId) }))
+
+// pending_invites — team email invitations
+export const pendingInvites = pgTable('pending_invites', {
+  id:        uuid('id').primaryKey().defaultRandom(),
+  teamId:    uuid('team_id').notNull().references(() => teams.id, { onDelete: 'cascade' }),
+  email:     text('email').notNull(),
+  token:     text('token').notNull().unique(),     // cryptographically random UUID v4
+  role:      text('role').notNull().default('team_member'),
+  expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),  // createdAt + INVITE_EXPIRY_DAYS
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  usedAt:    timestamp('used_at', { withTimezone: true }),               // null = pending; set on accept (one-time use)
+}, (t) => ({ uniq: unique().on(t.teamId, t.email) }))
+
+// anonymous_sessions — tracks cold-start anonymous sessions for GDPR cleanup
+export const anonymousSessions = pgTable('anonymous_sessions', {
+  id:           uuid('id').primaryKey().defaultRandom(),
+  supabaseAnonId: uuid('supabase_anon_id').notNull().unique(),  // auth.uid() of anonymous Supabase user
+  linkedAt:     timestamp('linked_at', { withTimezone: true }),  // null = unconverted; set on linkIdentity()
+  createdAt:    timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+})
+// Cron purges: WHERE linked_at IS NULL AND created_at < now() - interval '30 days'
+// On purge: DELETE associated reviews first (hard-delete), then DELETE anonymous_sessions row
+
+// processed_webhook_events — Stripe idempotency guard
+export const processedWebhookEvents = pgTable('processed_webhook_events', {
+  id:          uuid('id').primaryKey().defaultRandom(),
+  webhookId:   text('webhook_id').notNull().unique(),   // Stripe event.id
+  processedAt: timestamp('processed_at', { withTimezone: true }).notNull().defaultNow(),
+})
+
+// analytics_events — product event log (persisted via DAL from trackEvent())
+export const analyticsEvents = pgTable('analytics_events', {
+  id:         uuid('id').primaryKey().defaultRandom(),
+  eventName:  text('event_name').notNull(),                         // AppEvent string
+  userId:     uuid('user_id').references(() => profiles.id),       // null for anonymous events
+  metadata:   jsonb('metadata'),                                    // event-specific payload (no PII)
+  createdAt:  timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+})
+// Index: idx_analytics_events_name_created (eventName, createdAt) — funnel queries
+// Index: idx_analytics_events_user (userId, createdAt) — user cohort queries
+// RLS: admin-only read; server-only write (service role)
+```
+
+**Missing indexes beyond cards/reviews:**
+- `idx_decks_user_deleted (userId, deletedAt)` — soft-delete filtered list queries
+- `idx_team_members_team (teamId)` — team roster queries
+- `idx_team_members_user (userId)` — "which teams does this user belong to"
+- `idx_ai_usage_user_month (userId, monthStart)` — already enforced by unique constraint
+- `idx_analytics_events_name_created (eventName, createdAt)` — funnel analytics
+- `idx_pending_invites_token (token)` — invite acceptance lookup (already enforced by unique)
+
+**Unique constraints summary:**
+- `team_members(teamId, userId)` — no duplicate team membership
+- `ai_usage(userId, monthStart)` — one row per user per month
+- `pending_invites(teamId, email)` — no duplicate pending invites to same team
+- `pending_invites(token)` — invite tokens globally unique
+- `processed_webhook_events(webhookId)` — idempotency
+- `anonymous_sessions(supabaseAnonId)` — one record per anonymous session
+
+**Soft-delete cascade — DAL layer only (no DB triggers):**
+All `findMany` DAL queries include `where(isNull(table.deletedAt))`. Parent soft-delete (e.g., deck) does not cascade to children (cards, notes) in the DB — children are excluded by JOIN to non-deleted parent. Hard-delete of reviews on GDPR erasure is a direct `DELETE` in the DAL, wrapped in a transaction with the profile soft-delete.
+
+**Supabase Storage RLS (deck images):**
+Deck images uploaded to Supabase Storage bucket `deck-images`. Bucket policy: authenticated users can upload to path `{userId}/{deckId}/*` only; public read for `qa` mode image preview; RLS enforced at bucket level (separate from DB RLS).
+
+**Learning Fingerprint — Two-Layer Model:**
+
+The Learning Fingerprint is two distinct, independent systems:
+
+- **Layer 1 — Scheduling (when):** `user_fsrs_params` — the 21-weight FSRS-6 parameter array. Managed entirely by `ts-fsrs`. Adapts *when* each card is shown based on individual memory decay curves. No custom logic required.
+
+- **Layer 2 — Presentation (how), Pro/Team only:** `format_preferences` JSONB column on `profiles`. Tracks the user's engagement rate per `CardMode` as an EMA. Adapts *how* card content is presented. Free users are locked to `qa` mode — `updateFormatPreferences()` checks `profiles.tier` and is a no-op for Free users. `presentation_mode` and `response_time_ms` are still written to `reviews` for Free users (preserving signal for post-upgrade continuity), but `format_preferences` is never updated.
+
+```typescript
+// CardMode enum — exhaustive, used everywhere
+type CardMode = 'qa' | 'image' | 'context-narrative'
+// 'qa'               — classic front/back text question and answer
+// 'image'            — front shows image, back is text label/explanation
+// 'context-narrative'— content framed as a short story or real-world scenario
+
+// format_preferences shape stored in profiles.format_preferences
+type FormatPreferences = Record<CardMode, number>  // 0.0–1.0 EMA score
+// Default for new users: { qa: 0.5, image: 0.5, 'context-narrative': 0.5 }
+// null value (e.g., newly promoted Pro user) treated as the default above — getLearningSummary() returns 'qa'
+// Updated on every session completion via updateFormatPreferences(userId, tier, sessionResults)
+// If sessionResults is empty (abandoned session with zero reviews), updateFormatPreferences() is a no-op — EMA state unchanged
+// EMA formula: newScore = 0.8 * oldScore + 0.2 * sessionEngagementRate
+// Requires >5 completed sessions (FINGERPRINT_MIN_SESSIONS) before preferences diverge from default
+// Sessions while on Free tier DO count toward the threshold — counter is cumulative across tier changes
+// If user was Free for 3 sessions, upgrades to Pro: they need 2 more sessions before Layer 2 activates
+// Weak card queries (Story 4.5): only cards with state > 0 (Review=2 or Relearning=3) are candidates — New/Learning state cards have no computable retrievability and are excluded from weak-card filter
+```
+
+**How Layer 2 feeds the system:**
+1. **At AI generation (FR27/FR28):** The user's `format_preferences` are included in the generation system prompt, instructing the model to produce cards weighted toward the preferred mode.
+2. **At study session start:** `getLearningSummary(userId)` reads `format_preferences`, returns `preferredMode: CardMode` (highest-scoring mode). `<FlashCard mode={preferredMode}>` receives this as a prop.
+3. **Cold start / new users:** Default to `'qa'` mode. Layer 2 begins accumulating signal from the first session, silently.
+4. **GDPR:** `format_preferences` is personal data — deleted with account on GDPR deletion request (covered by existing deletion flow).
 
 **Migration Approach** — Drizzle Kit for all schema migrations (`drizzle-kit generate` + `drizzle-kit migrate`). RLS policies defined as SQL files in `/supabase/migrations/rls/` (infrastructure config, version-controlled but outside Drizzle). No raw SQL in application code.
 
@@ -168,15 +445,36 @@ Supporting tables:
 
 ### Authentication & Security
 
-**Session Handling** — Supabase SSR (`@supabase/ssr`) with HTTP-only cookies. No localStorage for auth tokens. Works natively with Next.js App Router RSCs and Server Actions.
+**Session Handling** — Supabase SSR (`@supabase/ssr`) with HTTP-only cookies. No localStorage for auth tokens. Works natively with Next.js App Router RSCs and Server Actions. **Password change** triggers Supabase GoTrue to invalidate all existing refresh tokens for that user — all other active sessions are forcibly logged out on their next token refresh (within the JWT TTL window, typically ≤1 hour). This is Supabase default behavior; no custom session revocation logic required for password change.
 
-**Cold Start → Auth Handoff** — Supabase anonymous sign-in on first cold start deck load. Anonymous session accumulates Learning Fingerprint signals server-side. On signup, `supabase.auth.linkIdentity()` upgrades the anonymous session to a real account — all data preserved, no localStorage fragility, GDPR-compliant.
+**Cold Start → Auth Handoff** — Supabase anonymous sign-in on first cold start deck load. Anonymous session stores only FSRS card ratings (necessary for scheduling — legitimate interest basis under GDPR). Behavioral profiling signals (`presentation_mode`, `response_time_ms`) are **not** written to `reviews` for anonymous sessions — only after authentication. On signup, `supabase.auth.linkIdentity()` upgrades the anonymous session to a real account — FSRS card state preserved, no localStorage fragility, GDPR-compliant. Learning Fingerprint Layer 2 begins accumulating from the first authenticated session. The cold start deck is owned by a dedicated **system user account** (`SYSTEM_USER_ID` env var, seeded in `seed.sql`) — it is a locked, non-interactive Supabase auth account; RLS policy grants anonymous and authenticated users read access to decks owned by this system user ID; no writes are permitted to the system user's decks by anyone other than `SUPABASE_SERVICE_ROLE` (used only in migrations/seed). **Operational rule:** the system user must never be deleted from Supabase Auth — cold start breaks silently if deleted. Application startup validates `SYSTEM_USER_ID` is set and the account exists on boot (DAL `validateSystemUser()` called in `next.config.ts` server init).
+
+**Session Revocation vs Password Change:**
+- **Session revocation (FR11, Story 2.3):** Supabase `auth.admin.signOut(userId, { scope: 'others' })` — immediately invalidates the specific session token server-side; that session cannot make new authenticated requests
+- **Password change (FR12, Story 2.2):** Supabase GoTrue invalidates all refresh tokens for the user; all other sessions expire at next token refresh attempt (within JWT TTL, typically ≤1 hour — not immediate but not a security gap given short TTL)
 
 **RBAC Enforcement** — `profiles.tier` column stores active subscription role (`anonymous | free | pro | team_member | team_admin`). Stripe webhook handler updates this column on subscription events. Supabase RLS policies reference `profiles.tier` via `auth.uid()` join — no client-side trust.
 
+**Team Invite → Tier Transition:**
+When a user accepts a team invite, the invite acceptance Server Action calls `updateProfileTier(userId, 'team_member')` (or `'team_admin'`). This supersedes any existing individual Pro subscription for the duration of team membership — the user's Stripe Pro subscription is **not** cancelled automatically. If the user later leaves or is removed from the team, `profiles.tier` reverts to `'free'` regardless of `previous_tier` value (individual Pro may have since lapsed). `previous_tier` is cleared to null on team exit. **Last-admin guard:** A team admin cannot leave or be deleted if they are the sole remaining admin in the workspace — the action is blocked with an error; another member must be promoted first. Logic:
+```typescript
+// On invite acceptance — in acceptTeamInvite() Server Action
+await updateProfileTier(userId, designatedRole) // 'team_member' | 'team_admin'
+// Individual Stripe subscription remains intact and continues billing — user must cancel it manually
+// UI shows notice if prior_tier === 'pro':
+//   "You've joined a team workspace — your team subscription now covers your access.
+//    Your individual Pro subscription is still active and will continue to be charged.
+//    Cancel it in billing settings if you no longer need it."
+// Store prior_tier in profiles.previous_tier (nullable) to surface the notice correctly
+```
+Add `previous_tier` (nullable text) to `profiles` to enable the notice and future revert logic.
+
+**Team member removal — atomicity:** `removeTeamMember()` Server Action executes in a single DB transaction: DELETE from `team_members` + DELETE from `team_deck_assignments` (for that user) + UPDATE `profiles.tier = 'free'` + CLEAR `profiles.previous_tier`. After commit, the removed user's next Server Action call will receive 403 on any team-gated resource (RLS re-evaluated per request). In-flight study session for a team deck completes normally — the next card load after removal returns 403.
+
 **Rate Limiting** — Vercel KV + `@upstash/ratelimit`. Applied at:
 - Auth endpoints: 10 attempts / 15 min per IP (NFR brute-force requirement)
-- AI generation: per-user monthly count enforced via `ai_usage` table + Upstash sliding window for burst protection
+- AI generation (monthly): per-user count enforced via `ai_usage` table — Free tier cap only; resets on the 1st of each calendar month (`ai_usage.reset_at` timestamp); 4th concurrent request when burst limit is full receives HTTP 429 immediately (no queue — user sees "try again shortly" message)
+- AI generation (burst — Free users only): Upstash sliding window, max 3 concurrent AI requests per free user — the 4th concurrent request (while 3 are in-flight) receives HTTP 429 immediately; client shows "You have too many AI requests in progress — please wait a moment"; Pro/Team users exempt from burst throttle entirely
 - Team invite sends: rate-limited to prevent abuse (FR52)
 
 ### API & Communication Patterns
@@ -185,11 +483,39 @@ Supporting tables:
 
 **AI Generation** — `streamObject()` (Vercel AI SDK `@ai-sdk/azure`) for full deck generation (20 cards, ≤15s) with progressive card display. `generateObject()` for single card operations (≤5s). All models are Azure OpenAI deployments (Sweden Central — EU Data Zone):
 - Short generation (topic/paste ≤20 cards): `gpt-4o-mini` deployment
-- Long document ingestion (large PDF/paste): `gpt-5.4-mini` deployment (400K context)
+- Long document ingestion (large PDF/paste): `gpt-4.1` deployment (1M context)
 - Automatic fallback on timeout/error: `gpt-4o` deployment (same Azure resource)
 - Learning Fingerprint analysis: `gpt-4o-mini` deployment
 
 All AI calls server-side only — API keys never reach the client.
+
+**Tier change during active session:**
+- In-flight AI generation request: completes with the tier active at request start (tier check is a gate, not re-checked mid-stream); if Free→Pro upgrade fires via webhook while generation is in-flight, the monthly credit is still decremented (old Free tier was active at gate time — no retroactive refund)
+- Burst throttle check runs **before** monthly credit decrement; a burst-rejected request (429) does NOT consume a credit
+- Active Zustand study session: tier change has no effect on the current session's FSRS calculations; next session start re-evaluates tier
+- `format_preferences` EMA update on session completion: uses tier at session completion time (post-webhook tier)
+- Pro→Free downgrade and later re-upgrade: `format_preferences` EMA is preserved (not cleared on downgrade); on re-upgrade the EMA resumes immediately — no new session threshold required; old signal is stale but valid as a warm start
+
+**Hesitation override — debug logging:**
+When override fires: `log({ action: 'fsrs.hesitation_override', userId, cardId, rawRating, effectiveRating: 'Again', responseTimeMs })` — logged at DEBUG level; not shown to user; queryable in admin log view for debugging unexpected scheduling behavior.
+
+**AI Generation — Input Sanitization (FR34):**
+- "Sanitize" means: strip HTML tags, truncate to max 50,000 characters (≈ 12,500 tokens), reject if > 1MB byte length before send
+- No PII stripping heuristics — sanitization is structural (size + format), not semantic content detection
+- Large paste (gpt-4.1 path): input is sent as-is up to 50,000 chars; if the model times out, the `gpt-4o` fallback is attempted on a truncated version (first 20,000 chars) with a user-visible notice: "Document was too large — generated from the first portion"
+- AI error codes mapping: `CONTENT_POLICY_VIOLATION` if Azure returns 400 with policy error; `AI_UNAVAILABLE` for all 5xx/timeout; `RATE_LIMIT_EXCEEDED` for 429 from Azure; all map to `{ data: null, error: ErrorCode }` Result type
+
+**Pro→Free downgrade — Layer 2 preservation:**
+When a Pro user downgrades to Free (subscription cancelled, `customer.subscription.deleted` fired), `profiles.format_preferences` is **preserved** (not cleared) — the EMA data is retained so that if the user re-upgrades, their fingerprint resumes immediately. However, `updateFormatPreferences()` is a no-op for Free users so no new EMA updates occur during the Free period.
+
+**AI mode fallback and EMA bias:**
+When a card is rendered in `qa` fallback mode (because its preferred mode `image` has null `imageUrl`), the rating for that card is excluded from `format_preferences` EMA update for the `image` mode bucket — only the actually-rendered mode's engagement score is updated.
+
+**AI Generation — Empty/Invalid Result Handling:**
+- If the model returns **zero cards**, the Server Action returns `{ data: null, error: 'generation_empty' }` — the usage credit is **not** decremented; the user sees "No cards were generated — please try a different prompt" with a retry option.
+- If any returned card has an empty `front_content` or `back_content`, that card is **silently filtered out** before the review screen; if all cards fail validation, treated as zero-card case above (credit not decremented).
+- **Partial results:** if 10 of 20 cards pass validation, those 10 are shown. Usage credit is decremented once regardless of how many cards survive validation (1 generation = 1 credit consumed if any valid card returned). User sees "10 cards generated" — no mention of filtered cards.
+- If the card mode (`image`) is returned but `imageUrl` is null, fall back to rendering that card in `qa` mode — never show a blank card face.
 
 **Error Handling** — `Result` type pattern `{ data: T | null, error: string | null }` returned from all DAL wrapper functions and Server Actions. No thrown exceptions in business logic. Errors are explicit, typed, and propagated deliberately. Sentry captures unhandled exceptions at the boundary.
 
@@ -202,7 +528,7 @@ All AI calls server-side only — API keys never reach the client.
 - No global state for server data
 
 **Study Session — Local-First:**
-Card ratings accumulated in Zustand store during session. Single Drizzle batch write via Server Action on session completion. `beforeunload` handler fires a `navigator.sendBeacon` to persist partial progress if tab closes mid-session. Zero data loss tolerance met without per-card round trips.
+Card ratings accumulated in Zustand store during session. Single Drizzle batch write via Server Action on session completion. `beforeunload` handler fires a `navigator.sendBeacon` to persist partial progress if tab closes mid-session — **best-effort delivery** (browser makes no guarantee on slow/offline connections). Partial saves are idempotent: `reviews` upsert on `(card_id, session_id)` — safe to retry. Zero data loss tolerance is met for normal session completions; mid-session tab-close partial saves are best-effort by browser constraint.
 
 **Component Organization:**
 - `src/components/ui/` — shadcn/ui primitives (auto-generated, do not edit manually)
@@ -253,7 +579,7 @@ naming, structure, data access, auth/security, API communication, frontend, infr
 
 **Database Naming (PostgreSQL / Drizzle):**
 - Tables: `snake_case` plural — `decks`, `notes`, `cards`, `reviews`, `user_fsrs_params`, `team_members`
-- Columns: `snake_case` — `user_id`, `deck_id`, `created_at`, `front_text`
+- Columns: `snake_case` — `user_id`, `deck_id`, `created_at`, `front_content`
 - Foreign keys: `{table_singular}_id` — `deck_id`, `note_id`, `user_id`
 - Indexes: `idx_{table}_{column(s)}` — `idx_cards_user_due`
 - Booleans: affirmative names — `is_active`, `has_completed`; NOT `not_deleted`
@@ -425,36 +751,46 @@ export function log(entry: LogEntry) {
   console.log(JSON.stringify({ ...entry, timestamp: new Date().toISOString() }))
 }
 ```
-All server-side events use `log()` — never raw `console.log(JSON.stringify(...))`.
+All server-side events use `log()` — never raw `console.log(JSON.stringify(...))`. **PII guard:** `log()` must never include user-supplied text content (deck titles, card content, AI prompts). Allowed fields: `userId`, `role`, `tier`, `action`, `errorCode`, `timestamp`, `requestId`. Card content and AI prompt text are never logged.
 
 **Analytics — typed event tracking:**
 ```typescript
 // src/lib/analytics.ts
 type AppEvent =
   | 'cold_start_viewed' | 'signup' | 'deck_created'
-  | 'ai_generation_used' | 'study_session_completed'
+  | 'ai_generation_used' | 'study_session_started' | 'study_session_completed'
   | 'paywall_hit' | 'upgrade' | 'team_created' | 'deck_assigned'
+  // study_session_started required for D1/D7/D30 retention cohort analysis (FR59)
 
 export function trackEvent(name: AppEvent, properties: Record<string, unknown>) {
   // Vercel Analytics + structured log
 }
 ```
-`trackEvent()` is called from Server Actions after successful operations corresponding to FR58 events.
+`trackEvent()` is called from Server Actions after successful operations corresponding to FR58 events. It is **fire-and-forget** — non-blocking, does not affect the operation's result. Telemetry loss on network failure is acceptable; analytics data is best-effort, not transactional.
 
 **Zustand Store Pattern:**
 ```typescript
+// Per-card review captured during the session — maps 1:1 to a reviews table row
+interface CardReview {
+  cardId: string
+  rating: Rating              // effective rating (post hesitation override)
+  responseTimeMs: number      // elapsed ms from card display to rating tap
+  presentationMode: CardMode  // CardMode used when this card was shown
+}
+
 interface StudySessionStore {
   queue: Card[]
   currentIndex: number
-  ratings: Rating[]
+  reviews: CardReview[]       // replaces flat Rating[] — carries all per-card signals
+  cardDisplayedAt: number | null  // Date.now() set when current card is presented
   startedAt: Date | null
-  initSession: (cards: Card[]) => void
-  rateCard: (rating: Rating) => void
-  getSessionResult: () => SessionResult  // returns data; component calls Server Action
+  initSession: (cards: Card[], preferredMode: CardMode) => void
+  rateCard: (rating: Rating) => void  // computes responseTimeMs, appends CardReview
+  getSessionResult: () => SessionResult  // returns reviews[]; component calls Server Action
   reset: () => void
 }
 ```
-`getSessionResult()` returns data only — it does NOT call the Server Action. The component calls the Server Action with the result. One store per domain. Stores are client-only — never imported in Server Components or DAL.
+`getSessionResult()` returns `{ reviews: CardReview[] }` — it does NOT call the Server Action. The component calls the Server Action with the result, which batch-writes all `CardReview` entries to the `reviews` table in a single Drizzle transaction. One store per domain. Stores are client-only — never imported in Server Components or DAL.
 
 **Server Action invocation pattern:**
 ```typescript
@@ -477,6 +813,7 @@ if (result.error) {
 // src/app/(app)/decks/actions.ts
 'use server'
 import { z } from 'zod'
+import { createUserClient } from '@/lib/supabase/user'
 import { createDeck } from '@/server/db/queries/decks'
 import { trackEvent } from '@/lib/analytics'
 import { log } from '@/lib/logger'
@@ -487,12 +824,16 @@ import type { Deck } from '@/types'
 const CreateDeckSchema = z.object({ title: z.string().min(1).max(100) })
 
 export async function createDeckAction(input: unknown): Promise<Result<Deck>> {
+  const supabase = createUserClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { data: null, error: { message: 'Unauthorized', code: 'UNAUTHORIZED' } }
+
   const parsed = CreateDeckSchema.safeParse(input)
   if (!parsed.success) return { data: null, error: { message: 'Invalid input' } }
 
-  const result = await createDeck({ ...parsed.data, userId: session.user.id })
+  const result = await createDeck({ ...parsed.data, userId: user.id })
   if (result.error) {
-    log({ action: 'deck.create.failed', error: result.error.message })
+    log({ action: 'deck.create.failed', userId: user.id, error: result.error.message })
     return result
   }
 
@@ -532,27 +873,105 @@ export async function findDecksByUserId(userId: string): Promise<Result<Deck[]>>
 **FSRS Encapsulation:**
 ```typescript
 // src/server/fsrs/index.ts — only file that imports ts-fsrs
-import { fsrs, createEmptyCard, Rating } from 'ts-fsrs'
+import { fsrs, createEmptyCard, Rating, State } from 'ts-fsrs'
+import { HESITATION_THRESHOLD_MS, FSRS_DEFAULT_RETENTION } from '@/lib/constants'
+
+// fsrs() is called with the desired retention target — use the shared constant throughout
+const f = fsrs({ request_retention: FSRS_DEFAULT_RETENTION })
+
 export function initializeCard() { return createEmptyCard() }
-export function scheduleCard(card: FSRSCard, rating: Rating, now: Date) {
-  return fsrs().repeat(card, now)[rating].card
+
+// scheduleCard() is the single entry point for all FSRS scheduling.
+// responseTimeMs: elapsed ms from card display to rating tap (captured in Zustand store)
+// If hesitation is detected on a mastered card, rating is silently overridden to Again.
+export function scheduleCard(
+  card: FSRSCard,
+  rating: Rating,
+  responseTimeMs: number,
+  now: Date
+): FSRSCard {
+  const isHesitation =
+    responseTimeMs > HESITATION_THRESHOLD_MS &&
+    card.state === State.Review
+  const effectiveRating = isHesitation ? Rating.Again : rating
+  return f.repeat(card, now)[effectiveRating].card
 }
 ```
 Nothing outside `src/server/fsrs/` imports from `ts-fsrs` directly.
 
+**Depth Score — Canonical Formula:**
+
+Depth Score is the mean FSRS-6 retrievability across all *seen* cards in a deck, expressed as a percentage (0–100).
+
+```typescript
+// src/server/fsrs/index.ts — f instance defined above, shared across all functions
+/**
+ * Depth Score = mean retrievability of all seen cards (state > 0) in a deck.
+ * Retrievability = probability of correct recall right now, per FSRS memory model.
+ * Cards with state = 0 (New — never reviewed) are excluded; they don't affect the score.
+ * Returns null if no cards have been seen yet (avoids misleading 0% on a fresh deck).
+ *
+ * ts-fsrs API: f.get_retrievability(card: FSRSCard, now: Date) → number (0–1)
+ */
+export function computeDepthScore(cards: FSRSCard[], now: Date): number | null {
+  const seenCards = cards.filter(c => c.state > 0)
+  if (seenCards.length === 0) return null
+  const total = seenCards.reduce(
+    (sum, c) => sum + f.get_retrievability(c, now),
+    0
+  )
+  return Math.round((total / seenCards.length) * 100)
+}
+```
+
+- **Display:** shown as an integer percentage (e.g. "73%") — never as a raw decimal
+- **Scope:** computed per-deck on the fly from the `cards` table; not stored as a column (avoids stale cache)
+- **Performance:** computed server-side in `getDeckDepthScore(deckId, now)` — fetches all `FSRSCard` fields for the deck, calls `computeDepthScore(cards, now)`; single query + in-process calculation; acceptable for MVP scale
+- **User-facing label:** "Depth Score" throughout the UI — never "retrievability" (too technical)
+
+**Hesitation Time Signal — Implementation (FR36):**
+
+Hesitation time is the elapsed milliseconds between card display and the user's rating tap. It is captured in the Zustand study session store and persisted in `reviews.response_time_ms` on session completion.
+
+```typescript
+// src/lib/constants.ts
+export const HESITATION_THRESHOLD_MS = 10_000   // 10 seconds — strictly greater than (> not >=); exactly 10000ms does NOT trigger override
+export const FSRS_DEFAULT_RETENTION = 0.9        // FSRS-6 desired retention target (90%); passed to fsrs()
+export const MAX_FREE_GENERATIONS = 10           // monthly AI generation cap for free-tier users (calendar month, UTC reset)
+export const FINGERPRINT_MIN_SESSIONS = 5        // min completed sessions before Layer 2 preferences diverge from default
+export const MIN_TEAM_SEATS = 3                  // minimum seats enforced at Stripe checkout
+export const WEAK_CARD_THRESHOLD = 0.70          // FSRS retrievability below this triggers "weak card" flag (Story 4.5)
+export const INVITE_EXPIRY_DAYS = 7              // pending_invites expiry window in days
+export const INVITE_RATE_LIMIT = 20              // max team invite sends per admin per hour
+
+// src/stores/useStudySessionStore.ts — see Zustand Store Pattern for full interface
+// cardDisplayedAt: number | null  — set to Date.now() when each card is presented
+// On rating: responseTimeMs = Date.now() - cardDisplayedAt
+//            CardReview { cardId, rating (effective), responseTimeMs, presentationMode }
+//            appended to reviews[]
+// scheduleCard() implementation: see FSRS Encapsulation section above
+```
+
+- **Threshold:** 10 seconds (`responseTimeMs > HESITATION_THRESHOLD_MS`, strictly greater than) on a `state = Review` (state=2) card triggers the override
+- **New/Learning/Relearning cards excluded:** only FSRS state 2 (Review — nominally mastered) triggers override; states 0 (New), 1 (Learning), 3 (Relearning) are excluded. Relearning (state 3) exclusion is intentional — the card already lapsed (was rated Again previously), so hesitation is expected during re-consolidation; applying a second override would be excessively punitive
+- **User transparency:** no UI indication of the override; it operates silently (per FR36 "silently")
+- **Stored rating:** `reviews.rating` stores the *effective* rating (post-override), not the raw user tap
+
 **Learning Fingerprint Data Flow:**
-- `presentation_mode` and `response_time_ms` stored per review in `reviews` table
-- At study session start: `getLearningSummary(userId)` aggregates per-modality performance from `reviews`
-- Session returns `preferredMode: CardMode` — server-side calculation, not client-side preference
+- `presentation_mode: CardMode` and `response_time_ms` stored per review in `reviews` table (raw signal)
+- On session completion: `updateFormatPreferences(userId, tier, sessionResults)` — checks `tier`; updates `profiles.format_preferences` EMA for Pro/Team users; no-op for Free users and empty sessions; **executed in the same DB transaction as the session write** (both succeed or both roll back)
+- At study session start: `getLearningSummary(userId, tier)` — returns `preferredMode: CardMode`; for Free users always returns `'qa'`; for Pro/Team reads `profiles.format_preferences` and returns highest-scoring mode
 - `<FlashCard mode={preferredMode}>` receives the mode as a prop
+- At AI generation: `format_preferences` included in system prompt to bias card output toward preferred mode
 
 **Shapeshifter Card Component:**
 ```typescript
 // Single component with internal strategy pattern
-type CardMode = 'text' | 'image' | 'context-narrative'
+// CardMode is the canonical enum — defined once in src/types/index.ts
+type CardMode = 'qa' | 'image' | 'context-narrative'
 <FlashCard card={card} mode={preferredMode} onRate={rateCard} />
 ```
-One `<FlashCard>` component, not separate `<TextCard>`, `<ImageCard>` components.
+One `<FlashCard>` component, not separate `<QACard>`, `<ImageCard>` components. Mode is a prop, not a separate component tree.
 
 **Study Session — Streaming for first-card NFR (<1s):**
 ```tsx
@@ -634,7 +1053,15 @@ RLS is a safety net — not the primary access control in application code.
 `middleware.ts` at project root:
 - Handles Supabase session refresh on every request
 - Redirects unauthenticated requests for `/(app)/*` routes to `/login`
+- Redirects requests for `/admin/*` routes to `/login` if unauthenticated, or returns 403 if authenticated but `profiles.is_admin = false`
 - Layout components READ session data only — never re-check authentication
+
+**Admin Access Model:**
+- `profiles.is_admin: boolean` (default `false`) — single column controls all admin access
+- Set to `true` manually via Supabase Studio for the developer account; never exposed in any UI
+- All `/admin/*` Server Components and Server Actions check `is_admin` as a first guard — return 403 if false
+- `createServerClient()` (service role) is used in admin routes only — never in user-facing routes
+- Admin role is independent of subscription tier: an admin account has `tier = 'free'` by default; `is_admin` is a separate axis
 - One security boundary, one location
 
 **Stripe Webhook Idempotency:**
@@ -643,8 +1070,17 @@ RLS is a safety net — not the primary access control in application code.
 const existing = await getProcessedWebhookEvent(event.id)
 if (existing.data) return { data: 'already_processed', error: null }
 await processEvent(event)
-await recordProcessedWebhookEvent(event.id)  // atomic with process
+await recordProcessedWebhookEvent(event.id)  // atomic with process — both in same DB transaction
 ```
+
+**Stripe Webhook Event Handling Rules:**
+- `customer.subscription.created` / `customer.subscription.updated` → update `profiles.tier` to the new Stripe subscription status
+- `customer.subscription.updated` with `cancel_at_period_end = true` → **no tier change**; user retains Pro access until `current_period_end`; tier downgrade fires only on `customer.subscription.deleted`
+- `customer.subscription.deleted` → set `profiles.tier = 'free'`
+- **Out-of-order delivery:** webhooks are processed as-arrived with idempotency guard. If `customer.subscription.deleted` arrives before `customer.subscription.created` (rare but possible), `processEvent()` calls `stripe.subscriptions.retrieve(subscriptionId)` before writing tier — if the Stripe API call fails (timeout/5xx), the webhook returns HTTP 500 to Stripe, which retries with exponential backoff; tier is not updated until the API confirms subscription state.
+- **Missing webhooks:** No compensating background job at MVP. Stripe's webhook retry policy (3 days, exponential back-off) is the recovery mechanism. Monitor webhook delivery via Stripe Dashboard.
+- **Webhook handler timeout:** Stripe requires a 200 response within 30 seconds. Heavy processing (e.g., bulk team member tier updates) must be deferred to a background job — the webhook handler only updates `profiles.tier` and records idempotency, never performs N+1 operations inline.
+- **Stripe API retry within handler:** The `stripe.subscriptions.retrieve()` call (out-of-order guard) is made once with a 5-second timeout. If it times out or returns 5xx, the handler returns HTTP 500 — Stripe retries the webhook; no internal retry loop (avoids blocking the 30-second handler window).
 
 **Pagination Convention — cursor-based from day one:**
 ```typescript
@@ -687,7 +1123,7 @@ SUPABASE_SERVICE_ROLE_KEY=
 AZURE_OPENAI_API_KEY=
 AZURE_OPENAI_ENDPOINT=            # https://{resource}.openai.azure.com/
 AZURE_OPENAI_DEPLOYMENT_FAST=     # gpt-4o-mini deployment name
-AZURE_OPENAI_DEPLOYMENT_LARGE=    # gpt-5.4-mini deployment name (400K context)
+AZURE_OPENAI_DEPLOYMENT_LARGE=    # gpt-4.1 deployment name (1M context)
 AZURE_OPENAI_DEPLOYMENT_FALLBACK= # gpt-4o deployment name
 # Stripe
 STRIPE_SECRET_KEY=
@@ -781,10 +1217,10 @@ FR categories map cleanly to directory structure. Schema split into focused sing
 - Add `axe-playwright` to E2E suite for WCAG 2.1 AA automated checks on core flows
 - Document local dev setup sequence in `README.md`: `supabase start` → `drizzle-kit migrate` → seed → `pnpm dev`
 - Validate `supabase.auth.linkIdentity()` race condition in a spike before Sprint 1 (two simultaneous anonymous sessions on different devices)
-- Add `session_started` to `AppEvent` union in `src/lib/analytics.ts` for D1/D7/D30 retention cohort support
+
 - Add `tests/integration/webhooks.test.ts` to project structure for Stripe idempotency verification
 - Rename E2E spec to `cold-start-to-signup.spec.ts` to explicitly cover the anonymous session handoff path
-- Add Supabase Edge Function cron job to purge unconverted anonymous sessions after X days (GDPR MVP requirement)
+- Add Supabase Edge Function cron job to purge unconverted anonymous sessions after **30 days** (GDPR data minimisation — `anonymous_sessions` where `linked_at IS NULL AND created_at < now() - interval '30 days'` evaluated in **UTC**; associated `reviews` records hard-deleted in same transaction; then session record deleted). Isolation: Postgres default READ COMMITTED means if `linkIdentity()` sets `linked_at` concurrently, the cron's `linked_at IS NULL` filter will correctly exclude the converting row — no additional locking needed
 
 **Supabase project setup (parallel first story, before any code runs):**
 1. Create Supabase project in Frankfurt region (EU data residency)
@@ -806,7 +1242,7 @@ FR categories map cleanly to directory structure. Schema split into focused sing
 
 **Architectural Decisions**
 - [x] Full stack documented (Next.js + Supabase + Drizzle + Vercel + Stripe + Azure OpenAI + Resend)
-- [x] Azure OpenAI model routing strategy (gpt-4o-mini / gpt-5.4-mini / gpt-4o fallback)
+- [x] Azure OpenAI model routing strategy (gpt-4o-mini / gpt-4.1 / gpt-4o fallback)
 - [x] Data schema design (notes/cards/reviews separation, soft-delete, FSRS params)
 - [x] Auth pattern (Supabase SSR + anonymous sessions + linkIdentity upgrade)
 - [x] Payment flow (Stripe webhook → profiles.tier → RLS)
@@ -860,7 +1296,7 @@ FR categories map cleanly to directory structure. Schema split into focused sing
 
 **Azure OpenAI Setup (before first code commit):**
 1. Create Azure OpenAI resource in **Sweden Central** region
-2. Deploy three models in Azure AI Foundry: `gpt-4o-mini`, `gpt-5.4-mini`, `gpt-4o`
+2. Deploy three models in Azure AI Foundry: `gpt-4o-mini`, `gpt-4.1`, `gpt-4o`
 3. Note deployment names → set as `AZURE_OPENAI_DEPLOYMENT_FAST/LARGE/FALLBACK` in `.env`
 
 **First Implementation Story — scaffold:**
@@ -1186,7 +1622,7 @@ User action → Client Component
 User prompt → Server Action → rate limit check → sanitize.ts
            → src/server/ai/index.ts → route by doc size:
              short (≤20 cards): gpt-4o-mini deployment
-             large doc (PDF):   gpt-5.4-mini deployment (400K context)
+             large doc (PDF):   gpt-4.1 deployment (1M context)
            → streamObject() → Azure OpenAI (Sweden Central)
            → [on timeout/error] → gpt-4o fallback deployment (same Azure resource)
            → Card[] stream → client progressive render → user reviews → save to DB
@@ -1214,7 +1650,7 @@ Upgrade click → createCheckoutSession() → Stripe hosted checkout
 | Integration | Entry Point | Credential |
 |---|---|---|
 | Azure OpenAI (gpt-4o-mini) | `src/server/ai/index.ts` | `AZURE_OPENAI_DEPLOYMENT_FAST` |
-| Azure OpenAI (gpt-5.4-mini) | `src/server/ai/index.ts` | `AZURE_OPENAI_DEPLOYMENT_LARGE` |
+| Azure OpenAI (gpt-4.1) | `src/server/ai/index.ts` | `AZURE_OPENAI_DEPLOYMENT_LARGE` |
 | Azure OpenAI (gpt-4o fallback) | `src/server/ai/index.ts` | `AZURE_OPENAI_DEPLOYMENT_FALLBACK` |
 | Stripe | `src/server/actions/stripe.ts` + webhook | `STRIPE_SECRET_KEY` |
 | Supabase | `src/lib/supabase/` | `SUPABASE_SERVICE_ROLE_KEY` / anon key |
