@@ -47,9 +47,11 @@ So that my privacy choices are respected and only consented cookies/analytics ar
   - [ ] Add `'use client'` directive at top of file
   - [ ] Render `null` until `isLoaded && !hasValidConsent()` — never render on SSR
   - [ ] Default view: three buttons — "Accept All", "Decline All", "Customize"
+  - [ ] Customize panel: initialize `analyticsChecked` local state from `consent.analytics` (not hardcoded `false`) — prevents silently revoking consent when user opens Customize after already accepting
   - [ ] Customize view: checkbox for analytics consent + "Save Preferences" + "Back" buttons
   - [ ] Functional cookies checkbox always checked + disabled (required, cannot be declined)
   - [ ] All buttons: visible focus rings, keyboard-activatable (`focus:ring-2 focus:ring-offset-2`)
+  - [ ] Focus trap: on banner mount, auto-focus the first button; trap Tab/Shift+Tab within the banner so keyboard users cannot interact with obscured page content behind it (WCAG 2.1 AA SC 2.1.2)
   - [ ] Root element: `role="dialog"` + `aria-label="Cookie consent"` (screen reader support)
   - [ ] Color contrast: use `text-gray-900` on white background (17.7:1 — exceeds 4.5:1 NFR-ACC4)
   - [ ] Fixed at bottom of viewport: `fixed bottom-0 left-0 right-0 z-50`
@@ -152,11 +154,10 @@ export const useCookieConsentStore = create<ConsentState>()(
       hasValidConsent: () => {
         const { consentGiven, expiresAt } = get()
         if (!consentGiven || !expiresAt) return false
-        if (Date.now() > expiresAt) {
-          get().resetConsent()
-          return false
-        }
-        return true
+        // Guard: localStorage may deserialise numbers as strings in some environments
+        const exp = typeof expiresAt === 'string' ? parseInt(expiresAt as string, 10) : expiresAt
+        if (isNaN(exp)) { get().resetConsent(); return false }
+        return Date.now() <= exp
       },
 
       resetConsent: () => set({
@@ -167,7 +168,10 @@ export const useCookieConsentStore = create<ConsentState>()(
     }),
     {
       name: 'cookie-consent',
-      storage: createJSONStorage(() => localStorage),
+      storage: createJSONStorage(() => {
+        // Fallback for private browsing / Safari ITP where localStorage may be blocked
+        try { return localStorage } catch { return { getItem: () => null, setItem: () => {}, removeItem: () => {} } }
+      }),
       // Exclude function references — only persist data fields
       partialize: (state) => ({
         analytics: state.analytics,
@@ -196,6 +200,12 @@ export function useCookieConsent() {
   // isLoaded = false on SSR and first render; true only after client hydration
   useEffect(() => {
     setIsLoaded(true)
+    // Check expiry on mount — reset if consent has expired (triggers banner re-appearance)
+    const { consentGiven, expiresAt, resetConsent } = useCookieConsentStore.getState()
+    if (consentGiven && expiresAt && Date.now() > expiresAt) {
+      resetConsent()
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   return {
@@ -225,7 +235,8 @@ import { useCookieConsent } from '@/hooks/useCookieConsent'
 export function CookieConsentBanner() {
   const { consent, hasValidConsent, acceptAll, declineAll, setAnalytics, isLoaded } = useCookieConsent()
   const [showCustomize, setShowCustomize] = useState(false)
-  const [analyticsChecked, setAnalyticsChecked] = useState(false)
+  // Initialize from stored consent — prevents showing wrong state if user opens Customize after accepting
+  const [analyticsChecked, setAnalyticsChecked] = useState(consent.analytics)
 
   // Never render on SSR or if valid consent already exists
   if (!isLoaded || hasValidConsent()) return null
@@ -234,8 +245,9 @@ export function CookieConsentBanner() {
     return (
       <div
         role="dialog"
-        aria-modal="false"
+        aria-modal="true"
         aria-label="Cookie preferences"
+        aria-live="polite"
         className="fixed bottom-0 left-0 right-0 z-50 bg-white border-t border-gray-200 p-4 shadow-lg"
       >
         <div className="max-w-7xl mx-auto">
@@ -267,7 +279,7 @@ export function CookieConsentBanner() {
               Back
             </button>
             <button
-              onClick={() => setAnalytics(analyticsChecked)}
+              onClick={() => { setAnalytics(analyticsChecked); setShowCustomize(false) }}
               className="px-4 py-2 text-sm font-medium text-white bg-gray-900 rounded hover:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-900"
             >
               Save Preferences
@@ -281,8 +293,9 @@ export function CookieConsentBanner() {
   return (
     <div
       role="dialog"
-      aria-modal="false"
+      aria-modal="true"
       aria-label="Cookie consent"
+      aria-live="polite"
       className="fixed bottom-0 left-0 right-0 z-50 bg-white border-t border-gray-200 p-4 shadow-lg"
     >
       <div className="max-w-7xl mx-auto flex flex-col sm:flex-row items-start sm:items-center gap-4">
@@ -346,13 +359,19 @@ export function Analytics() {
 ```typescript
 // src/components/shared/AnalyticsLoader.tsx
 'use client'
+import { useState, useEffect } from 'react'
 import { Analytics } from '@/lib/analytics'
 import { useCookieConsentStore } from '@/stores/cookie-consent'
 
 export function AnalyticsLoader() {
+  const [ready, setReady] = useState(false)
   const analytics = useCookieConsentStore((s) => s.analytics)
   const consentGiven = useCookieConsentStore((s) => s.consentGiven)
-  if (!consentGiven || !analytics) return null
+
+  useEffect(() => { setReady(true) }, [])
+
+  // Hydration guard: never render analytics before client-side store is confirmed
+  if (!ready || !consentGiven || !analytics) return null
   return <Analytics />
 }
 ```
@@ -392,7 +411,8 @@ New test files:
 - [ ] `partialize` excludes function references — only `analytics`, `consentGiven`, `expiresAt` persisted
 - [ ] `isLoaded` guard prevents banner render before hydration (no SSR/client mismatch warnings)
 - [ ] `hasValidConsent()` checks BOTH `consentGiven` AND `expiresAt > Date.now()`
-- [ ] Expired consent auto-resets via `resetConsent()` call inside `hasValidConsent()`
+- [ ] Expired consent reset happens in `useCookieConsent` hook's `useEffect` on mount — NOT inside `hasValidConsent()` getter (side effects in selectors cause render loops)
+- [ ] `analyticsChecked` local state in Customize view initialized from `consent.analytics`, not hardcoded `false`
 - [ ] No DB writes — no Supabase calls anywhere in this story
 - [ ] `profiles.gdprConsentAt` is NOT updated here — that belongs to Story 1.5 (user registration)
 - [ ] `analytics: false` in initial state — analytics blocked by default until consent
