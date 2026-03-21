@@ -30,7 +30,7 @@ so that all subsequent development has a consistent, zero-tech-debt foundation.
 
 6. `src/lib/constants.ts` exports all shared app constants: `HESITATION_THRESHOLD_MS`, `FSRS_DEFAULT_RETENTION`, `MAX_FREE_GENERATIONS`, `FINGERPRINT_MIN_SESSIONS`, `MIN_TEAM_SEATS`, `WEAK_CARD_THRESHOLD`, `INVITE_EXPIRY_DAYS`, `INVITE_RATE_LIMIT`
 
-7. All Server Actions are typed to return `Result<T>` — no thrown exceptions across business logic boundaries
+7. `src/lib/analytics.ts` exports `trackEvent(name: AppEvent, properties: Record<string, unknown>)` wired to Vercel Analytics — fire-and-forget, non-blocking
 
 8. Sentry is integrated (`pnpm add @sentry/nextjs`) with critical alert rules for payment and auth failures (within 5 min threshold per NFR-REL3)
 
@@ -50,12 +50,12 @@ so that all subsequent development has a consistent, zero-tech-debt foundation.
   - [ ] Run `npx create-next-app@latest flashcards --typescript --tailwind --eslint --app --src-dir --import-alias "@/*" --turbopack`
   - [ ] Verify `src/` directory structure exists with `app/`, `components/`, `lib/`
 
-- [ ] Task 2: Install all required packages (AC: #2, #8, #9, #11)
+- [ ] Task 2: Install all required packages (AC: #2, #7, #8, #9, #11)
   - [ ] `pnpm add drizzle-orm drizzle-kit`
   - [ ] `pnpm add @sentry/nextjs`
   - [ ] `pnpm add ai @ai-sdk/azure`
   - [ ] `pnpm add zod` (peer dep of AI SDK, install explicitly)
-  - [ ] `pnpm add framer-motion` (card flip animation only)
+  - [ ] `pnpm add @vercel/analytics` (Vercel Analytics — required by analytics.ts)
   - [ ] `pnpm add -D vitest @vitejs/plugin-react` (unit testing)
   - [ ] `pnpm add -D @playwright/test axe-playwright` (E2E + accessibility)
   - [ ] `pnpm add -D husky`
@@ -76,7 +76,7 @@ so that all subsequent development has a consistent, zero-tech-debt foundation.
 
 - [ ] Task 6: Create analytics utility (AC: #7)
   - [ ] Create `src/lib/analytics.ts` with `AppEvent` type and `trackEvent()` function
-  - [ ] Wire to Vercel Analytics (fire-and-forget, non-blocking)
+  - [ ] Wire to Vercel Analytics via `@vercel/analytics` (fire-and-forget, non-blocking)
 
 - [ ] Task 7: Create AI model router (AC: #11)
   - [ ] Create `src/server/ai/index.ts` with `getAIModel(route: 'fast' | 'large' | 'fallback')` function
@@ -87,10 +87,13 @@ so that all subsequent development has a consistent, zero-tech-debt foundation.
   - [ ] Run Sentry Next.js wizard or manually add `sentry.client.config.ts`, `sentry.server.config.ts`, `sentry.edge.config.ts`
   - [ ] Configure alert for payment failures and auth failures within 5-minute threshold
 
-- [ ] Task 9: Configure testing (AC: #9)
+- [ ] Task 9: Configure testing and write utility unit tests (AC: #9)
   - [ ] Create `vitest.config.ts` for unit tests
   - [ ] Create `playwright.config.ts` with `axe-playwright` integration
   - [ ] Create `src/tests/helpers/` directory for shared test utilities
+  - [ ] Write `src/lib/logger.test.ts` — verify `log()` outputs valid JSON to stdout and never includes user-supplied content fields
+  - [ ] Write `src/lib/constants.test.ts` — verify all exported constant values match the canonical spec
+  - [ ] Write `src/types/errors.test.ts` — verify all `ErrorCodes` keys and values are present
 
 - [ ] Task 10: Configure environment variables (AC: #10)
   - [ ] Create `.env.example` with ALL canonical env vars and comments
@@ -122,11 +125,13 @@ so that all subsequent development has a consistent, zero-tech-debt foundation.
 Install in this order after scaffold:
 1. `pnpm add drizzle-orm drizzle-kit` + Drizzle config
 2. `pnpm add ai @ai-sdk/azure` (Vercel AI SDK)
-3. Later stories add: `pnpm add ts-fsrs`, `pnpm add stripe @stripe/stripe-js`, `pnpm add resend`, `pnpm add @upstash/ratelimit @vercel/kv`, `pnpm add zustand`
-4. `npx shadcn@latest init` (shadcn/ui — do NOT add in this story)
+3. `pnpm add @vercel/analytics` (Vercel Analytics — used by analytics.ts)
+4. Later stories add: `pnpm add ts-fsrs`, `pnpm add stripe @stripe/stripe-js`, `pnpm add resend`, `pnpm add @upstash/ratelimit @vercel/kv`, `pnpm add zustand`
+5. `npx shadcn@latest init` (shadcn/ui — do NOT add in this story)
 
 **DO NOT** install Supabase packages in this story — that is Story 1.2.
 **DO NOT** install ts-fsrs — that is Story 1.2+.
+**DO NOT** install `framer-motion` in this story — defer to the story that implements card flip animation.
 
 ### Canonical `Result<T>` Type (AC #3 — must match exactly)
 

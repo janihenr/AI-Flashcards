@@ -24,7 +24,11 @@
       "Bash(ls:*)",
       "WebFetch(domain:create.t3.gg)",
       "WebFetch(domain:azure.microsoft.com)",
-      "WebFetch(domain:learn.microsoft.com)"
+      "WebFetch(domain:learn.microsoft.com)",
+      "Bash(git -C \"C:/Users/janihenr/Projektit/BMAD/Flashcards\" log --oneline --all)",
+      "Bash(git -C \"C:/Users/janihenr/Projektit/BMAD/Flashcards\" show --stat HEAD)",
+      "Bash(git -C \"C:/Users/janihenr/Projektit/BMAD/Flashcards\" show --stat 54b683a)",
+      "Bash(git -C \"C:/Users/janihenr/Projektit/BMAD/Flashcards\" show --stat 42bc812)"
     ]
   }
 }
