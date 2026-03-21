@@ -35,7 +35,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 
 generated: 2026-03-21
-last_updated: 2026-03-21
+last_updated: 2026-03-21  # updated by create-story: 1-3 → ready-for-dev
 project: Flashcards
 project_key: NOKEY
 tracking_system: file-system
@@ -45,8 +45,8 @@ development_status:
   # ─── Epic 1: Foundation & Cold Start Experience ───
   epic-1: in-progress
   1-1-project-scaffold-and-core-infrastructure-setup: ready-for-dev
-  1-2-supabase-foundation-and-auth-infrastructure: backlog
-  1-3-cookie-consent-banner-and-gdpr-consent-storage: backlog
+  1-2-supabase-foundation-and-auth-infrastructure: ready-for-dev
+  1-3-cookie-consent-banner-and-gdpr-consent-storage: ready-for-dev
   1-4-anonymous-cold-start-deck-study: backlog
   1-5-user-registration-google-oauth-and-email-password: backlog
   1-6-anonymous-session-upgrade-to-registered-account: backlog
