@@ -28,7 +28,20 @@
       "Bash(git -C \"C:/Users/janihenr/Projektit/BMAD/Flashcards\" log --oneline --all)",
       "Bash(git -C \"C:/Users/janihenr/Projektit/BMAD/Flashcards\" show --stat HEAD)",
       "Bash(git -C \"C:/Users/janihenr/Projektit/BMAD/Flashcards\" show --stat 54b683a)",
-      "Bash(git -C \"C:/Users/janihenr/Projektit/BMAD/Flashcards\" show --stat 42bc812)"
+      "Bash(git -C \"C:/Users/janihenr/Projektit/BMAD/Flashcards\" show --stat 42bc812)",
+      "Bash(npx:*)",
+      "Bash(printf \"\\\\nn\\\\n\")",
+      "Bash(cp -r /c/Users/janihenr/AppData/Local/Temp/flashcards-scaffold/src /c/Users/janihenr/Projektit/BMAD/Flashcards/)",
+      "Bash(cp /c/Users/janihenr/AppData/Local/Temp/flashcards-scaffold/package.json /c/Users/janihenr/Projektit/BMAD/Flashcards/)",
+      "Bash(cp /c/Users/janihenr/AppData/Local/Temp/flashcards-scaffold/tsconfig.json /c/Users/janihenr/Projektit/BMAD/Flashcards/)",
+      "Bash(cp /c/Users/janihenr/AppData/Local/Temp/flashcards-scaffold/next.config.ts /c/Users/janihenr/Projektit/BMAD/Flashcards/)",
+      "Bash(cp /c/Users/janihenr/AppData/Local/Temp/flashcards-scaffold/next-env.d.ts /c/Users/janihenr/Projektit/BMAD/Flashcards/)",
+      "Bash(pnpm install:*)",
+      "Bash(pnpm add:*)",
+      "Bash(pnpm exec:*)",
+      "Bash(pnpm dlx:*)",
+      "Bash(pnpm tsc:*)",
+      "Bash(pnpm eslint:*)"
     ]
   }
 }

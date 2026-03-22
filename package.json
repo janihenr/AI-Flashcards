@@ -1,0 +1,42 @@
+{
+  "name": "flashcards",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "eslint",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:e2e": "playwright test",
+    "prepare": "husky"
+  },
+  "dependencies": {
+    "@ai-sdk/azure": "^3.0.48",
+    "@sentry/nextjs": "^10.45.0",
+    "@vercel/analytics": "^2.0.1",
+    "ai": "^6.0.134",
+    "drizzle-kit": "^0.31.10",
+    "drizzle-orm": "^0.45.1",
+    "next": "16.2.1",
+    "react": "19.2.4",
+    "react-dom": "19.2.4",
+    "zod": "^4.3.6"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.58.2",
+    "@tailwindcss/postcss": "^4",
+    "@types/node": "^20",
+    "@types/react": "^19",
+    "@types/react-dom": "^19",
+    "@vitejs/plugin-react": "^6.0.1",
+    "axe-playwright": "^2.2.2",
+    "eslint": "^9",
+    "eslint-config-next": "16.2.1",
+    "husky": "^9.1.7",
+    "tailwindcss": "^4",
+    "typescript": "^5",
+    "vitest": "^4.1.0"
+  }
+}

@@ -1,6 +1,6 @@
 # Story 1.1: Project Scaffold & Core Infrastructure Setup
 
-Status: ready-for-dev
+Status: review
 
 ## Story
 
@@ -46,67 +46,67 @@ so that all subsequent development has a consistent, zero-tech-debt foundation.
 
 ## Tasks / Subtasks
 
-- [ ] Task 1: Bootstrap Next.js project (AC: #1)
-  - [ ] Run `npx create-next-app@latest flashcards --typescript --tailwind --eslint --app --src-dir --import-alias "@/*" --turbopack`
-  - [ ] Verify `src/` directory structure exists with `app/`, `components/`, `lib/`
+- [x] Task 1: Bootstrap Next.js project (AC: #1)
+  - [x] Run `npx create-next-app@latest flashcards --typescript --tailwind --eslint --app --src-dir --import-alias "@/*" --turbopack`
+  - [x] Verify `src/` directory structure exists with `app/`, `components/`, `lib/`
 
-- [ ] Task 2: Install all required packages (AC: #2, #7, #8, #9, #11)
-  - [ ] `pnpm add drizzle-orm drizzle-kit`
-  - [ ] `pnpm add @sentry/nextjs`
-  - [ ] `pnpm add ai @ai-sdk/azure`
-  - [ ] `pnpm add zod` (peer dep of AI SDK, install explicitly)
-  - [ ] `pnpm add @vercel/analytics` (Vercel Analytics — required by analytics.ts)
-  - [ ] `pnpm add -D vitest @vitejs/plugin-react` (unit testing)
-  - [ ] `pnpm add -D @playwright/test axe-playwright` (E2E + accessibility)
-  - [ ] `pnpm add -D husky`
+- [x] Task 2: Install all required packages (AC: #2, #7, #8, #9, #11)
+  - [x] `pnpm add drizzle-orm drizzle-kit`
+  - [x] `pnpm add @sentry/nextjs`
+  - [x] `pnpm add ai @ai-sdk/azure`
+  - [x] `pnpm add zod` (peer dep of AI SDK, install explicitly)
+  - [x] `pnpm add @vercel/analytics` (Vercel Analytics — required by analytics.ts)
+  - [x] `pnpm add -D vitest @vitejs/plugin-react` (unit testing)
+  - [x] `pnpm add -D @playwright/test axe-playwright` (E2E + accessibility)
+  - [x] `pnpm add -D husky`
 
-- [ ] Task 3: Configure Drizzle ORM (AC: #2)
-  - [ ] Create `drizzle.config.ts` with `casing: 'camelCase'`, `dialect: 'postgresql'`, `schema: './src/server/db/schema'`, `out: './supabase/migrations'`
-  - [ ] Create `src/server/db/index.ts` (Drizzle client placeholder — connection requires Supabase from Story 1.2)
-  - [ ] Create `src/server/db/schema/` directory with placeholder `index.ts`
+- [x] Task 3: Configure Drizzle ORM (AC: #2)
+  - [x] Create `drizzle.config.ts` with `casing: 'camelCase'`, `dialect: 'postgresql'`, `schema: './src/server/db/schema'`, `out: './supabase/migrations'`
+  - [x] Create `src/server/db/index.ts` (Drizzle client placeholder — connection requires Supabase from Story 1.2)
+  - [x] Create `src/server/db/schema/` directory with placeholder `index.ts`
 
-- [ ] Task 4: Create core type definitions (AC: #3, #5, #6)
-  - [ ] Create `src/types/index.ts` with `Result<T>` type + `CardMode` type
-  - [ ] Create `src/types/errors.ts` with `ErrorCodes` registry
-  - [ ] Create `src/lib/constants.ts` with all shared constants
+- [x] Task 4: Create core type definitions (AC: #3, #5, #6)
+  - [x] Create `src/types/index.ts` with `Result<T>` type + `CardMode` type
+  - [x] Create `src/types/errors.ts` with `ErrorCodes` registry
+  - [x] Create `src/lib/constants.ts` with all shared constants
 
-- [ ] Task 5: Create logger utility (AC: #4)
-  - [ ] Create `src/lib/logger.ts` with typed `LogEntry` interface and `log()` function
-  - [ ] Ensure PII guard is enforced — no user-supplied text content in logs
+- [x] Task 5: Create logger utility (AC: #4)
+  - [x] Create `src/lib/logger.ts` with typed `LogEntry` interface and `log()` function
+  - [x] Ensure PII guard is enforced — no user-supplied text content in logs
 
-- [ ] Task 6: Create analytics utility (AC: #7)
-  - [ ] Create `src/lib/analytics.ts` with `AppEvent` type and `trackEvent()` function
-  - [ ] Wire to Vercel Analytics via `@vercel/analytics` (fire-and-forget, non-blocking)
+- [x] Task 6: Create analytics utility (AC: #7)
+  - [x] Create `src/lib/analytics.ts` with `AppEvent` type and `trackEvent()` function
+  - [x] Wire to Vercel Analytics via `@vercel/analytics` (fire-and-forget, non-blocking)
 
-- [ ] Task 7: Create AI model router (AC: #11)
-  - [ ] Create `src/server/ai/index.ts` with `getAIModel(route: 'fast' | 'large' | 'fallback')` function
-  - [ ] Reads `AZURE_OPENAI_DEPLOYMENT_FAST/LARGE/FALLBACK` env vars
-  - [ ] Uses `@ai-sdk/azure` — never exposes API key to client
+- [x] Task 7: Create AI model router (AC: #11)
+  - [x] Create `src/server/ai/index.ts` with `getAIModel(route: 'fast' | 'large' | 'fallback')` function
+  - [x] Reads `AZURE_OPENAI_DEPLOYMENT_FAST/LARGE/FALLBACK` env vars
+  - [x] Uses `@ai-sdk/azure` — never exposes API key to client
 
-- [ ] Task 8: Configure Sentry (AC: #8)
-  - [ ] Run Sentry Next.js wizard or manually add `sentry.client.config.ts`, `sentry.server.config.ts`, `sentry.edge.config.ts`
-  - [ ] Configure alert for payment failures and auth failures within 5-minute threshold
+- [x] Task 8: Configure Sentry (AC: #8)
+  - [x] Run Sentry Next.js wizard or manually add `sentry.client.config.ts`, `sentry.server.config.ts`, `sentry.edge.config.ts`
+  - [x] Configure alert for payment failures and auth failures within 5-minute threshold
 
-- [ ] Task 9: Configure testing and write utility unit tests (AC: #9)
-  - [ ] Create `vitest.config.ts` for unit tests
-  - [ ] Create `playwright.config.ts` with `axe-playwright` integration
-  - [ ] Create `src/tests/helpers/` directory for shared test utilities
-  - [ ] Write `src/lib/logger.test.ts` — verify `log()` outputs valid JSON to stdout and never includes user-supplied content fields
-  - [ ] Write `src/lib/constants.test.ts` — verify all exported constant values match the canonical spec
-  - [ ] Write `src/types/errors.test.ts` — verify all `ErrorCodes` keys and values are present
+- [x] Task 9: Configure testing and write utility unit tests (AC: #9)
+  - [x] Create `vitest.config.ts` for unit tests
+  - [x] Create `playwright.config.ts` with `axe-playwright` integration
+  - [x] Create `src/tests/helpers/` directory for shared test utilities
+  - [x] Write `src/lib/logger.test.ts` — verify `log()` outputs valid JSON to stdout and never includes user-supplied content fields
+  - [x] Write `src/lib/constants.test.ts` — verify all exported constant values match the canonical spec
+  - [x] Write `src/types/errors.test.ts` — verify all `ErrorCodes` keys and values are present
 
-- [ ] Task 10: Configure environment variables (AC: #10)
-  - [ ] Create `.env.example` with ALL canonical env vars and comments
-  - [ ] Create `.env.local` locally (git-ignored) with dev values
+- [x] Task 10: Configure environment variables (AC: #10)
+  - [x] Create `.env.example` with ALL canonical env vars and comments
+  - [x] Create `.env.local` locally (git-ignored) with dev values
 
-- [ ] Task 11: Configure Husky + next.config.ts (AC: #12, #13)
-  - [ ] Initialize Husky: `pnpm dlx husky init`
-  - [ ] Add pre-push hook: `tsc --noEmit && eslint . --max-warnings 0`
-  - [ ] Configure `next.config.ts` with security headers in canonical order
+- [x] Task 11: Configure Husky + next.config.ts (AC: #12, #13)
+  - [x] Initialize Husky: `pnpm dlx husky init`
+  - [x] Add pre-push hook: `tsc --noEmit && eslint . --max-warnings 0`
+  - [x] Configure `next.config.ts` with security headers in canonical order
 
-- [ ] Task 12: Set up project directory structure
-  - [ ] Create all directories from canonical structure (see Project Structure Notes)
-  - [ ] Add `.gitkeep` for empty directories that need to exist
+- [x] Task 12: Set up project directory structure
+  - [x] Create all directories from canonical structure (see Project Structure Notes)
+  - [x] Add `.gitkeep` for empty directories that need to exist
 
 ## Dev Notes
 
@@ -454,6 +454,68 @@ claude-sonnet-4-6
 
 ### Debug Log References
 
+- Scaffolded via temp directory (`/tmp/flashcards-scaffold`) due to `create-next-app` restriction on capital letters in directory names; files copied to project root.
+- `analytics.ts`: Cast `Record<string, unknown>` to `@vercel/analytics` expected type to fix TS2345.
+- ESLint config updated to ignore `_bmad/**`, `_bmad-output/**`, `design-artifacts/**`, `docs/**` — BMAD framework files not part of app source.
+
 ### Completion Notes List
 
+- Next.js 16.2.1 scaffolded with TypeScript strict mode, Tailwind CSS v4, ESLint, App Router, src/ dir, `@/*` import alias, Turbopack.
+- All packages installed with pnpm: drizzle-orm, drizzle-kit, @sentry/nextjs, ai, @ai-sdk/azure, zod, @vercel/analytics (prod); vitest, @vitejs/plugin-react, @playwright/test, axe-playwright, husky (dev).
+- Drizzle config with exact spec values: `casing: 'camelCase'`, `dialect: 'postgresql'`, `schema: './src/server/db/schema'`, `out: './supabase/migrations'`.
+- Canonical `Result<T>` and `CardMode` types in `src/types/index.ts`; `ErrorCodes` registry in `src/types/errors.ts`; all 8 constants in `src/lib/constants.ts` with exact values.
+- `log()` function with PII guard — typed `LogEntry` interface; no user-supplied content fields.
+- `trackEvent()` wired to `@vercel/analytics` — fire-and-forget via `void track()`.
+- AI model router with `aiModels.fast/large/fallback` using `@ai-sdk/azure` — server-only.
+- Sentry configured with `sentry.client.config.ts`, `sentry.server.config.ts`, `sentry.edge.config.ts`; wired via `withSentryConfig()` in `next.config.ts`.
+- Security headers: X-Frame-Options DENY, X-Content-Type-Options nosniff, Referrer-Policy strict-origin-when-cross-origin, CSP.
+- Husky pre-push hook runs `tsc --noEmit` + `eslint . --max-warnings 0`.
+- 24 unit tests written and passing: logger (6), constants (9), errors (5) + Result<T>/CardMode in errors tests.
+- Full canonical directory structure created with `.gitkeep` for empty dirs.
+- `.env.example` documents all 20 env vars with comments; `.env.local` git-ignored.
+
 ### File List
+
+- `package.json`
+- `pnpm-lock.yaml`
+- `tsconfig.json`
+- `next.config.ts`
+- `next-env.d.ts`
+- `drizzle.config.ts`
+- `vitest.config.ts`
+- `playwright.config.ts`
+- `eslint.config.mjs`
+- `postcss.config.mjs`
+- `sentry.client.config.ts`
+- `sentry.server.config.ts`
+- `sentry.edge.config.ts`
+- `.env.example`
+- `.env.local`
+- `.husky/pre-push`
+- `CLAUDE.md`
+- `src/app/layout.tsx`
+- `src/app/page.tsx`
+- `src/app/globals.css`
+- `src/app/favicon.ico`
+- `src/types/index.ts`
+- `src/types/errors.ts`
+- `src/types/errors.test.ts`
+- `src/lib/logger.ts`
+- `src/lib/logger.test.ts`
+- `src/lib/analytics.ts`
+- `src/lib/constants.ts`
+- `src/lib/constants.test.ts`
+- `src/server/db/index.ts`
+- `src/server/db/schema/index.ts`
+- `src/server/ai/index.ts`
+- `src/server/fsrs/index.ts`
+- `src/server/email/index.ts`
+- `src/tests/helpers/index.ts`
+- `supabase/seed.sql`
+- `public/` (scaffold defaults)
+
+## Change Log
+
+| Date | Description |
+|------|-------------|
+| 2026-03-22 | Story 1.1 implemented — Next.js scaffold, all packages installed, core utilities (Result, ErrorCodes, constants, logger, analytics, AI router), Sentry config, Husky pre-push hook, security headers, vitest + playwright configs, 24 unit tests passing, full canonical directory structure, .env.example |

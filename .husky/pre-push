@@ -1,0 +1,3 @@
+#!/bin/sh
+pnpm tsc --noEmit
+pnpm eslint . --max-warnings 0
