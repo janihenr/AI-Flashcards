@@ -27,8 +27,8 @@ export function FlashCard({ card, mode, onRate, sessionReady = false }: FlashCar
       case 'image':
         // Never render <img src=""> — fires a request to the page URL; fall back to text
         if (!card.imageUrl) return <p className="text-xl font-medium text-gray-900">{card.frontContent}</p>
-        // eslint-disable-next-line @next/next/no-img-element -- image mode requires raw <img> per story spec; URLs are user-provided placeholder values
-        return <img src={card.imageUrl} alt={card.frontContent} className="w-full rounded" />
+        // eslint-disable-next-line @next/next/no-img-element -- user-provided URLs span arbitrary domains; next/image requires explicit remotePatterns per domain
+        return <img src={card.imageUrl} alt={card.frontContent} loading="lazy" width={640} height={360} className="w-full rounded" />
       case 'context-narrative':
         // Never render empty italic paragraph; fall back to front text
         if (!card.narrativeContext) return <p className="text-xl font-medium text-gray-900">{card.frontContent}</p>

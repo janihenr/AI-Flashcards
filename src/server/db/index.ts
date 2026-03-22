@@ -5,7 +5,8 @@ import * as relations from './relations'
 
 // Transaction mode pooler — { prepare: false } required for Supabase Pooler (serverless)
 // DATABASE_URL = Supabase Pooler transaction mode URL (port 6543)
-const client = postgres(process.env.DATABASE_URL!, { prepare: false })
+if (!process.env.DATABASE_URL) throw new Error('Missing required environment variable: DATABASE_URL')
+const client = postgres(process.env.DATABASE_URL, { prepare: false })
 
 // Spread relations into schema for stable relations() API (defineRelations is beta-only)
 // casing: 'snake_case' maps camelCase TS properties ↔ snake_case DB columns

@@ -62,7 +62,8 @@ const _getSystemDeckCached = unstable_cache(
       return { data: null, error: { message: 'Database error', code: 'DB_ERROR' } }
     }
   },
-  ['system-deck'],
+  // Include systemUserId in key so changing SYSTEM_USER_ID env var busts the cache immediately
+  ['system-deck', process.env.SYSTEM_USER_ID ?? ''],
   { tags: ['system-deck'], revalidate: 3600 }
 )
 

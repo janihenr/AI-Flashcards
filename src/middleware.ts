@@ -9,10 +9,14 @@ export async function middleware(request: NextRequest, context: NextFetchEvent) 
     const ip = (request as NextRequest & { ip?: string }).ip
       ?? request.headers.get('x-forwarded-for')?.split(',')[0]?.trim()
       ?? 'anonymous'
-    const { success, pending } = await authLimiter.limit(ip)
-    context.waitUntil(pending)
-    if (!success) {
-      return NextResponse.json({ error: 'RATE_LIMIT_EXCEEDED' }, { status: 429 })
+    try {
+      const { success, pending } = await authLimiter.limit(ip)
+      context.waitUntil(pending)
+      if (!success) {
+        return NextResponse.json({ error: 'RATE_LIMIT_EXCEEDED' }, { status: 429 })
+      }
+    } catch {
+      // Redis unavailable — fail open rather than blocking all auth requests
     }
   }
 

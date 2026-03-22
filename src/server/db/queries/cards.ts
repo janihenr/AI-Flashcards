@@ -1,4 +1,4 @@
-import { eq, asc, and, gt, getTableColumns } from 'drizzle-orm'
+import { eq, asc, and, gt, or, getTableColumns } from 'drizzle-orm'
 import { db } from '@/server/db'
 import { cards, notes } from '@/server/db/schema'
 import type { Result } from '@/types'
@@ -82,12 +82,20 @@ export async function findCardsByDeckId(
   try {
     const limit = Math.max(1, Math.min(pagination.limit, 100))
 
+    // Composite cursor: "isoDate|uuid" — prevents silent row skipping when cards share createdAt
     let cursorCondition = undefined
     if (pagination.cursor) {
       const decoded = decodeCursor(pagination.cursor)
-      const d = new Date(decoded)
-      if (!isNaN(d.getTime())) {
-        cursorCondition = gt(cards.createdAt, d)
+      const sepIdx = decoded.lastIndexOf('|')
+      if (sepIdx !== -1) {
+        const d = new Date(decoded.slice(0, sepIdx))
+        const cursorId = decoded.slice(sepIdx + 1)
+        if (!isNaN(d.getTime()) && cursorId) {
+          cursorCondition = or(
+            gt(cards.createdAt, d),
+            and(eq(cards.createdAt, d), gt(cards.id, cursorId))
+          )
+        }
       }
     }
 
@@ -101,8 +109,9 @@ export async function findCardsByDeckId(
 
     const hasMore = rows.length > limit
     const items = hasMore ? rows.slice(0, limit) : rows
+    const last = items[items.length - 1]
     const nextCursor = hasMore
-      ? encodeCursor(items[items.length - 1].createdAt.toISOString())
+      ? encodeCursor(`${last.createdAt.toISOString()}|${last.id}`)
       : null
 
     return { data: { items, nextCursor }, error: null }

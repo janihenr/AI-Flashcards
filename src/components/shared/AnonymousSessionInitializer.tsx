@@ -1,15 +1,14 @@
 'use client'
-import { useEffect } from 'react'
+import { useEffect, useRef } from 'react'
 import { createBrowserClient } from '@supabase/ssr'
 import { useStudySessionStore } from '@/stores/study-session'
 
-// Module-level flag prevents concurrent double sign-in (React StrictMode or rapid re-mounts)
-// Flag guards only the signInAnonymously call — getUser() is always checked first so existing
-// sessions (e.g., user navigates away and back) are detected without needing to re-init.
-let anonInitStarted = false
-
 export function AnonymousSessionInitializer() {
   const setSessionReady = useStudySessionStore((s) => s.setSessionReady)
+  // useRef instead of module-level flag — scoped to this component instance.
+  // Module-level flags survive unmount; if the user navigates away mid-signInAnonymously,
+  // the promise callback that resets the flag never fires and future mounts can never init.
+  const initStartedRef = useRef(false)
 
   useEffect(() => {
     const url = process.env.NEXT_PUBLIC_SUPABASE_URL
@@ -24,22 +23,20 @@ export function AnonymousSessionInitializer() {
     // Always call getUser() first — if user already exists (prior nav or restored session), skip init
     supabase.auth.getUser().then(({ data: { user } }) => {
       if (user) {
-        // Session already exists — mark ready immediately
         setSessionReady(true)
         return
       }
-      // No session — guard here (not at top of effect) to still detect existing sessions on re-entry
-      if (anonInitStarted) return
-      anonInitStarted = true
+      if (initStartedRef.current) return
+      initStartedRef.current = true
       supabase.auth
         .signInAnonymously()
         .then(() => {
-          anonInitStarted = false // reset so re-mounts after session loss can retry
+          initStartedRef.current = false
           setSessionReady(true)
         })
         .catch((err) => {
           console.error('[AnonymousSessionInitializer] signInAnonymously failed:', err)
-          anonInitStarted = false // allow retry on next mount
+          initStartedRef.current = false
         })
     })
   }, [setSessionReady])
