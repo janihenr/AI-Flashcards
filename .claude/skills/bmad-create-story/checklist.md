@@ -118,13 +118,21 @@ You will systematically re-do the entire story creation process, but with a crit
   - Architecture decisions implemented
   - Testing approaches used
 
-#### **2.5 Latest Technical Research**
+#### **2.5 Latest Technical Research via Context7 MCP**
 
-- Identify any libraries/frameworks mentioned
-- Research latest versions and critical information:
-  - Breaking changes or security updates
-  - Performance improvements or deprecations
-  - Best practices for current versions
+- Identify all third-party libraries and services referenced in this story and architecture
+- For each library, use Context7 MCP to fetch current documentation:
+  1. Call `mcp__context7__resolve-library-id` with the library name
+  2. Call `mcp__context7__query-docs` with a targeted topic query for what this story uses
+- Do NOT rely on training-data knowledge — validate every API signature, config option, and import path against live docs
+- Extract and verify:
+  - Current method signatures (e.g., `getUser()` vs deprecated `getSession()`)
+  - Required vs deprecated configuration options
+  - Correct import paths and package names for the current version
+  - Breaking changes introduced since common documentation examples were written
+  - Security-relevant API changes
+
+**Gap check:** Does the existing story include any API patterns, configuration snippets, or package names that Context7 docs show as outdated, deprecated, or incorrect for the current version? These are critical misses — flag them as blockers.
 
 ### **Step 3: Disaster Prevention Gap Analysis**
 

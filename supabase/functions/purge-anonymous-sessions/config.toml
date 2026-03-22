@@ -1,0 +1,2 @@
+[functions.purge-anonymous-sessions]
+schedule = "0 3 * * *"  # Daily at 03:00 UTC

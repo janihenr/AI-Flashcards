@@ -47,12 +47,19 @@ describe('log()', () => {
     expect(output.durationMs).toBe(42)
   })
 
-  it('does NOT include deck title or card content fields in the type signature', () => {
-    // Verify the LogEntry type doesn't have fields for user-supplied content
-    // The log function signature itself enforces this at compile time
-    const entry = { action: 'test', timestamp: '' }
-    expect(Object.keys(entry)).not.toContain('deckTitle')
-    expect(Object.keys(entry)).not.toContain('cardContent')
-    expect(Object.keys(entry)).not.toContain('aiPrompt')
+  it('serializes Error objects to their message string instead of {}', () => {
+    log({ action: 'test', timestamp: '', error: new Error('boom') as unknown as string })
+    const output = JSON.parse(consoleSpy.mock.calls[0][0] as string)
+    expect(output.error).toBe('boom')
+  })
+
+  it('does not leak user-supplied content passed via index signature', () => {
+    // Even though the index signature allows unknown keys, reserved PII fields must not appear
+    // in typical structured log calls — this ensures callers are not passing them
+    log({ action: 'ai.generate.deck', userId: 'u-1', timestamp: '' })
+    const output = JSON.parse(consoleSpy.mock.calls[0][0] as string)
+    expect(output).not.toHaveProperty('deckTitle')
+    expect(output).not.toHaveProperty('cardContent')
+    expect(output).not.toHaveProperty('aiPrompt')
   })
 })

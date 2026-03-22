@@ -48,8 +48,8 @@ Core architectural demands: cold start anonymous experience with auth transition
   - `gpt-4o` — fallback if primary deployment unavailable
   - `gpt-4o-mini-tts` + `gpt-4o-transcribe` — Phase 2 audio cards
 - **ORM** — Drizzle (type-safe, edge-friendly, SQL-close)
-- **AI abstraction** — Vercel AI SDK (`@ai-sdk/azure`) with `generateObject()` / `streamObject()` + Zod
-- **SRS library** — `ts-fsrs` (official TypeScript FSRS-6 implementation)
+- **AI abstraction** — Vercel AI SDK (`@ai-sdk/azure`) with `streamText()` + `Output.object()` (v5/v6 preferred pattern) or `generateObject()` for single-card operations + Zod
+- **SRS library** — `ts-fsrs` (official TypeScript FSRS-6 implementation, requires Node.js 18+)
 - **Infrastructure** — $0/month at launch; scale trigger at MRR > $200/mo (Supabase Pro $25 + Vercel Pro $20)
 - **Data residency** — Supabase: EU Frankfurt; Azure OpenAI: Sweden Central (both satisfy GDPR EU data residency)
 
@@ -114,12 +114,12 @@ Not included by default — Vitest + Playwright added as first-story dependency
 - `src/server/` — server-only logic (AI calls, Stripe, Drizzle queries)
 
 **Post-scaffold layer additions (in order):**
-1. Supabase (`pnpm add @supabase/supabase-js @supabase/ssr`) + Drizzle (`pnpm add drizzle-orm drizzle-kit`)
+1. Supabase (`pnpm add @supabase/supabase-js @supabase/ssr`) + Drizzle (`pnpm add drizzle-orm`) + Postgres driver (`pnpm add postgres`) — **Note:** `drizzle-kit` is devDependency only
 2. Vercel AI SDK (`pnpm add ai @ai-sdk/azure`)
-3. ts-fsrs (`pnpm add ts-fsrs`)
+3. ts-fsrs (`pnpm add ts-fsrs`) — requires Node.js 18+
 4. Stripe (`pnpm add stripe @stripe/stripe-js`)
-5. Resend (`pnpm add resend`)
-6. Rate limiting (`pnpm add @upstash/ratelimit @vercel/kv`) — auth brute-force + AI burst throttle + team invite limits
+5. Resend (`pnpm add resend react-email @react-email/components`)
+6. Rate limiting (`pnpm add @upstash/ratelimit @upstash/redis`) — auth brute-force + AI burst throttle + team invite limits
 7. shadcn/ui (`npx shadcn@latest init`)
 8. Framer Motion (`pnpm add framer-motion`) — card flip animation only; no other use
 9. Vitest + Playwright (testing)
@@ -143,7 +143,7 @@ Not included by default — Vitest + Playwright added as first-story dependency
 - Result type error handling pattern throughout DAL
 - Streaming AI generation for full decks; request/response for single cards
 - Sentry + structured JSON logging for observability
-- Vercel KV + Upstash for rate limiting
+- Upstash Redis (`@upstash/redis`) + `@upstash/ratelimit` for rate limiting
 
 **Deferred Decisions (Post-MVP):**
 - PWA / service worker (offline capability)
@@ -471,7 +471,7 @@ Add `previous_tier` (nullable text) to `profiles` to enable the notice and futur
 
 **Team member removal — atomicity:** `removeTeamMember()` Server Action executes in a single DB transaction: DELETE from `team_members` + DELETE from `team_deck_assignments` (for that user) + UPDATE `profiles.tier = 'free'` + CLEAR `profiles.previous_tier`. After commit, the removed user's next Server Action call will receive 403 on any team-gated resource (RLS re-evaluated per request). In-flight study session for a team deck completes normally — the next card load after removal returns 403.
 
-**Rate Limiting** — Vercel KV + `@upstash/ratelimit`. Applied at:
+**Rate Limiting** — `@upstash/redis` + `@upstash/ratelimit`. Applied at:
 - Auth endpoints: 10 attempts / 15 min per IP (NFR brute-force requirement)
 - AI generation (monthly): per-user count enforced via `ai_usage` table — Free tier cap only; resets on the 1st of each calendar month (`ai_usage.reset_at` timestamp); 4th concurrent request when burst limit is full receives HTTP 429 immediately (no queue — user sees "try again shortly" message)
 - AI generation (burst — Free users only): Upstash sliding window, max 3 concurrent AI requests per free user — the 4th concurrent request (while 3 are in-flight) receives HTTP 429 immediately; client shows "You have too many AI requests in progress — please wait a moment"; Pro/Team users exempt from burst throttle entirely
@@ -481,7 +481,7 @@ Add `previous_tier` (nullable text) to `profiles` to enable the notice and futur
 
 **API Layer** — Server Actions for all internal mutations (deck CRUD, card ratings, AI generation triggers, subscription management). Route Handlers (`/api/`) only for: Stripe webhooks, Resend webhooks, and any future third-party callbacks. Minimizes API surface for solo dev maintainability.
 
-**AI Generation** — `streamObject()` (Vercel AI SDK `@ai-sdk/azure`) for full deck generation (20 cards, ≤15s) with progressive card display. `generateObject()` for single card operations (≤5s). All models are Azure OpenAI deployments (Sweden Central — EU Data Zone):
+**AI Generation** — `streamText()` + `Output.object()` (Vercel AI SDK v5/v6 preferred pattern, `@ai-sdk/azure`) for full deck generation (20 cards, ≤15s) with progressive card display. `generateObject()` for single card operations (≤5s). All models are Azure OpenAI deployments (Sweden Central — EU Data Zone):
 - Short generation (topic/paste ≤20 cards): `gpt-4o-mini` deployment
 - Long document ingestion (large PDF/paste): `gpt-4.1` deployment (1M context)
 - Automatic fallback on timeout/error: `gpt-4o` deployment (same Azure resource)
@@ -545,7 +545,12 @@ Card ratings accumulated in Zustand store during session. Single Drizzle batch w
 - Production: Vercel (EU-optimized) + Supabase Frankfurt (EU data residency)
 
 **Observability:**
-- Sentry (free tier, Vercel integration) — error capture, alerting on critical events (payment failures, auth failures) within 5 min (NFR)
+- Sentry (free tier, Vercel integration) — error capture, alerting on critical events (payment failures, auth failures) within 5 min (NFR). Setup uses current Next.js SDK pattern:
+  - `instrumentation.ts` (project root) — server-side `register()` with `onRequestError` hook
+  - `instrumentation-client.ts` (project root) — client-side init with `tracesSampleRate` env-aware
+  - `next.config.ts` — `withSentryConfig()` with `tunnelRoute: '/monitoring'` and `enableLogs: true`
+  - Env vars: `NEXT_PUBLIC_SENTRY_DSN` (client), `SENTRY_DSN` (server)
+  - **Not used:** `sentry.client.config.ts` / `sentry.server.config.ts` (legacy pattern)
 - Structured JSON logging (FR54–57) — `console.log` with JSON shape `{ action, userId, role, timestamp, error?, stack? }` — queryable via Vercel Log Drains and admin dashboard
 
 ### Decision Impact Analysis
@@ -554,7 +559,7 @@ Card ratings accumulated in Zustand store during session. Single Drizzle batch w
 1. Scaffold (`create-next-app`) + Supabase local setup
 2. Drizzle schema + RLS SQL files
 3. Supabase Auth + anonymous session + `profiles.tier`
-4. Vercel KV + Upstash rate limiting
+4. Upstash Redis rate limiting (`@upstash/redis` + `@upstash/ratelimit`, env: `UPSTASH_REDIS_REST_URL` / `UPSTASH_REDIS_REST_TOKEN`)
 5. Drizzle DAL wrapper functions
 6. Server Actions pattern + Result type
 7. Stripe integration + webhook + tier sync
@@ -686,6 +691,20 @@ export default defineConfig({
   casing: 'camelCase', // snake_case in DB → camelCase in TypeScript automatically
 })
 ```
+
+**Drizzle Client Setup:**
+```typescript
+// src/server/db/index.ts
+import 'server-only'
+import { drizzle } from 'drizzle-orm/postgres-js'
+import postgres from 'postgres'
+import * as schema from './schema'
+
+// `prepare: false` is mandatory for Supabase Transaction pool mode (serverless)
+const client = postgres(process.env.DATABASE_URL!, { prepare: false })
+export const db = drizzle(client, { schema, casing: 'camelCase' })
+```
+`DATABASE_URL` is the Supabase pooler connection string (Transaction mode, port 6543). `prepare: false` prevents prepared-statement errors in serverless environments.
 
 ### Format Patterns
 
@@ -877,7 +896,8 @@ import { fsrs, createEmptyCard, Rating, State } from 'ts-fsrs'
 import { HESITATION_THRESHOLD_MS, FSRS_DEFAULT_RETENTION } from '@/lib/constants'
 
 // fsrs() is called with the desired retention target — use the shared constant throughout
-const f = fsrs({ request_retention: FSRS_DEFAULT_RETENTION })
+// enable_short_term: false disables same-day relearning steps (not appropriate for flashcard apps)
+const f = fsrs({ request_retention: FSRS_DEFAULT_RETENTION, enable_short_term: false })
 
 export function initializeCard() { return createEmptyCard() }
 
@@ -1064,6 +1084,19 @@ RLS is a safety net — not the primary access control in application code.
 - Admin role is independent of subscription tier: an admin account has `tier = 'free'` by default; `is_admin` is a separate axis
 - One security boundary, one location
 
+**Stripe Webhook — Raw Body (critical):**
+Stripe signature verification requires the raw request body. In Next.js App Router Route Handlers, use `req.text()` — **never** `req.json()`:
+```typescript
+// src/app/api/stripe/webhook/route.ts
+export async function POST(req: Request) {
+  const body = await req.text()  // raw body required for stripe.webhooks.constructEvent()
+  const sig = req.headers.get('stripe-signature')!
+  const event = stripe.webhooks.constructEvent(body, sig, process.env.STRIPE_WEBHOOK_SECRET!)
+  // ...
+}
+```
+Using `req.json()` corrupts the body and makes signature verification fail.
+
 **Stripe Webhook Idempotency:**
 ```typescript
 // Every webhook handler — check before process
@@ -1117,8 +1150,9 @@ const AIGenerationPanel = dynamic(() => import('@/components/deck/AIGenerationPa
 ```bash
 # Supabase
 NEXT_PUBLIC_SUPABASE_URL=
-NEXT_PUBLIC_SUPABASE_ANON_KEY=
-SUPABASE_SERVICE_ROLE_KEY=
+NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=  # sb_publishable_xxx — safe for browser with RLS
+SUPABASE_SECRET_KEY=                   # server-only, bypasses RLS
+DATABASE_URL=                          # Supabase pooler connection string (Transaction mode, port 6543) for Drizzle
 # Azure OpenAI (Sweden Central — EU Data Zone)
 AZURE_OPENAI_API_KEY=
 AZURE_OPENAI_ENDPOINT=            # https://{resource}.openai.azure.com/
@@ -1131,11 +1165,15 @@ STRIPE_WEBHOOK_SECRET=
 NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY=
 # Resend
 RESEND_API_KEY=
-# Vercel KV (Upstash)
-KV_REST_API_URL=
-KV_REST_API_TOKEN=
+# Upstash Redis (rate limiting)
+UPSTASH_REDIS_REST_URL=
+UPSTASH_REDIS_REST_TOKEN=
+# Sentry
+NEXT_PUBLIC_SENTRY_DSN=           # client-side (NEXT_PUBLIC_ required)
+SENTRY_DSN=                       # server-side
 # App
 NEXT_PUBLIC_APP_URL=
+SYSTEM_USER_ID=
 ```
 
 **`next.config.ts` Canonical Section Order:**

@@ -268,25 +268,32 @@ Load config from `{project-root}/_bmad/bmm/config.yaml` and resolve:
   <action>Identify any architectural decisions that override previous patterns</action>
 </step>
 
-<step n="4" goal="Web research for latest technical specifics">
-  <critical>🌐 ENSURE LATEST TECH KNOWLEDGE - Prevent outdated implementations!</critical> **WEB INTELLIGENCE:** <action>Identify specific
-  technical areas that require latest version knowledge:</action>
+<step n="4" goal="Context7 MCP research for latest third-party library documentation">
+  <critical>🌐 ENSURE LATEST TECH KNOWLEDGE via Context7 MCP - Prevent outdated API patterns and breaking changes!</critical>
 
-  <!-- Check for libraries/frameworks mentioned in architecture -->
-  <action>From architecture analysis, identify specific libraries, APIs, or
-  frameworks</action>
-  <action>For each critical technology, research latest stable version and key changes:
-    - Latest API documentation and breaking changes
-    - Security vulnerabilities or updates
-    - Performance improvements or deprecations
-    - Best practices for current version
+  <!-- Identify third-party libraries from architecture and story requirements -->
+  <action>From architecture analysis and story requirements, list all third-party libraries and services referenced:
+    Examples: Supabase, Drizzle ORM, Next.js, @upstash/ratelimit, @vercel/kv, Stripe, Resend, Vercel AI SDK, Vitest, Playwright, etc.
   </action>
-  **EXTERNAL CONTEXT INCLUSION:** <action>Include in story any critical latest information the developer needs:
-    - Specific library versions and why chosen
-    - API endpoints with parameters and authentication
-    - Recent security patches or considerations
-    - Performance optimization techniques
-    - Migration considerations if upgrading
+
+  <!-- Use Context7 MCP to fetch current documentation for each critical library -->
+  <action>For each library relevant to this story's implementation:
+    1. Call `mcp__context7__resolve-library-id` with the library name to get the Context7 library ID
+    2. Call `mcp__context7__query-docs` with the library ID and a topic query matching what this story needs
+       (e.g., "SSR cookie session setup", "RLS policies", "sliding window rate limit", "drizzle-kit generate")
+    3. Extract: current API signatures, required configuration, breaking changes from prior versions, deprecations
+  </action>
+
+  <critical>DO NOT rely on training-data knowledge for API signatures, configuration options, or SDK patterns.
+  Third-party libraries evolve — what was correct 6 months ago may now be deprecated or broken.</critical>
+
+  <!-- Include findings in story -->
+  <action>For each library researched, include in the story's Dev Notes any critical current information:
+    - Correct import paths and package names for current version
+    - API method signatures that differ from common (possibly outdated) examples
+    - Configuration options that are required vs deprecated
+    - Security-relevant changes (e.g., getSession() vs getUser() in Supabase)
+    - Version-specific gotchas the developer must know
   </action>
 </step>
 

@@ -27,6 +27,9 @@ Thumbs.db
 *.swp
 *.swo
 
+# MCP config (contains personal access tokens)
+.mcp.json
+
 # Logs
 *.log
 npm-debug.log*

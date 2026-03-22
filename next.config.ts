@@ -1,6 +1,16 @@
 import type { NextConfig } from 'next'
 import { withSentryConfig } from '@sentry/nextjs'
 
+// Startup validation — fails fast if system user is missing (cold start deck would break silently)
+if (typeof window === 'undefined' && process.env.DATABASE_URL && process.env.SYSTEM_USER_ID) {
+  import('@/server/db/queries/users').then(({ validateSystemUser }) => {
+    validateSystemUser().catch((err: Error) => {
+      console.error('[STARTUP FAILURE]', err.message)
+      process.exit(1)
+    })
+  })
+}
+
 // Canonical section order: images → headers → redirects → experimental
 const nextConfig: NextConfig = {
   images: {

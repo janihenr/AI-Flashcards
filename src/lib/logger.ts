@@ -8,11 +8,16 @@ interface LogEntry {
   role?: string
   timestamp: string
   durationMs?: number
-  error?: string
+  error?: string | Error
   stack?: string
   [key: string]: unknown
 }
 
 export function log(entry: LogEntry) {
-  console.log(JSON.stringify({ ...entry, timestamp: new Date().toISOString() }))
+  const serialized = { ...entry, timestamp: new Date().toISOString() }
+  // Coerce Error objects to string so they don't serialize as {}
+  if (serialized.error instanceof Error) {
+    serialized.error = serialized.error.message
+  }
+  console.log(JSON.stringify(serialized))
 }
