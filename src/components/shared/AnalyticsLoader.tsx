@@ -8,6 +8,7 @@ export function AnalyticsLoader() {
   const analytics = useCookieConsentStore((s) => s.analytics)
   const consentGiven = useCookieConsentStore((s) => s.consentGiven)
 
+  // eslint-disable-next-line react-hooks/set-state-in-effect -- hydration guard: setReady(true) on mount is the standard pattern to prevent SSR/CSR mismatch
   useEffect(() => { setReady(true) }, [])
 
   // Hydration guard: never render analytics before client-side store is confirmed

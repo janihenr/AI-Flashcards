@@ -19,6 +19,7 @@ export function FlashCard({ card, mode, onRate, sessionReady = false }: FlashCar
 
   // Reset flip state when the card changes (prevents showing back of previous card)
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- state reset on prop change is the React-recommended pattern when key prop is not applicable
     setIsFlipped(false)
   }, [card.id])
 

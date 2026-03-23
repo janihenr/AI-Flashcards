@@ -1,15 +1,11 @@
 'use client'
-import { useState, useRef, useEffect } from 'react'
+import { useState, useRef } from 'react'
 import { useCookieConsent } from '@/hooks/useCookieConsent'
 
 export function CookieConsentBanner() {
   const { consent, hasValidConsent, acceptAll, declineAll, setAnalytics, isLoaded } = useCookieConsent()
   const [showCustomize, setShowCustomize] = useState(false)
   const [analyticsChecked, setAnalyticsChecked] = useState(consent.analytics)
-  // Sync with store on open — handles cross-tab writes that mutate the persisted store after mount
-  useEffect(() => {
-    if (showCustomize) setAnalyticsChecked(consent.analytics)
-  }, [showCustomize, consent.analytics])
   const bannerRef = useRef<HTMLDivElement>(null)
 
   // Auto-focus first button on mount and on view switch (WCAG 2.1 AA SC 2.1.2)
@@ -109,7 +105,7 @@ export function CookieConsentBanner() {
             Decline All
           </button>
           <button
-            onClick={() => setShowCustomize(true)}
+            onClick={() => { setAnalyticsChecked(consent.analytics); setShowCustomize(true) }}
             className="px-4 py-2 text-sm font-medium text-gray-700 border border-gray-300 rounded hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500"
           >
             Customize
