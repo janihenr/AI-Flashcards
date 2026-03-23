@@ -9,6 +9,9 @@ export default defineConfig({
     globals: true,
     include: ['src/**/*.test.ts', 'src/**/*.test.tsx', 'tests/**/*.test.ts'],
     exclude: ['node_modules', '.next'],
+    env: {
+      DATABASE_URL: process.env.DATABASE_URL ?? 'postgresql://placeholder/placeholder',
+    },
   },
   resolve: {
     alias: {

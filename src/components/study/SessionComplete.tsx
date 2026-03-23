@@ -1,12 +1,6 @@
 'use client'
 import Link from 'next/link'
-
-interface CardReview {
-  cardId: string
-  rating: 1 | 2 | 3 | 4
-  responseTimeMs: number
-  presentationMode: string
-}
+import type { CardReview } from '@/stores/study-session'
 
 interface SessionCompleteProps {
   ratings: CardReview[]
@@ -68,7 +62,7 @@ export function SessionComplete({ ratings }: SessionCompleteProps) {
 
         <div className="flex flex-col gap-3">
           <Link
-            href="/signup"
+            href="/signup?upgrade=true"
             className="w-full inline-flex items-center justify-center px-6 py-3 rounded-lg bg-blue-600 text-white font-semibold hover:bg-blue-700 transition-colors"
           >
             Sign up to save progress

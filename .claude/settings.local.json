@@ -74,12 +74,20 @@
       "WebFetch(domain:code.claude.com)",
       "Skill(update-config)",
       "Bash(jq --version)",
-      "Bash(python \"$HOME/.claude/save-conversation.py\")",
-      "Bash(TRANSCRIPT=\"$HOME/.claude/projects/C--Users-janihenr-Projektit-BMAD-Flashcards/fbc339c0-0b2c-405b-840c-590e174ba13b.jsonl\" echo \"{\"\"session_id\"\":\"\"fbc339c0-0b2c-405b-840c-590e174ba13b\"\",\"\"transcript_path\"\":\"\"$TRANSCRIPT\"\",\"\"cwd\"\":\"\"/c/Users/janihenr/Projektit/BMAD/Flashcards\"\"}\")",
       "Bash(python:*)",
-      "Bash(TRANSCRIPT=\"C:/Users/janihenr/.claude/projects/C--Users-janihenr-Projektit-BMAD-Flashcards/fbc339c0-0b2c-405b-840c-590e174ba13b.jsonl\" echo \"{\"\"session_id\"\":\"\"fbc339c0-0b2c-405b-840c-590e174ba13b\"\",\"\"transcript_path\"\":\"\"$TRANSCRIPT\"\",\"\"cwd\"\":\"\"C:\\\\Users\\\\janihenr\\\\Projektit\\\\BMAD\\\\Flashcards\"\"}\")",
-      "Bash(head -30 \"C:/Users/janihenr/Projektit/BMAD/Flashcards/history-prompts/\"*.md)",
-      "Bash(\"/c/Users/janihenr/Projektit/BMAD/Flashcards/.gitignore\")"
+      "Bash(xargs wc:*)",
+      "Bash(where supabase:*)",
+      "Read(//c/Users/janihenr/AppData/Local/**)",
+      "Read(//c/Program Files/**)",
+      "Bash(pnpm setup:*)",
+      "Bash(npm install:*)",
+      "Bash(where scoop:*)",
+      "Bash(supabase start:*)",
+      "Bash(for f:*)",
+      "Bash(do git:*)",
+      "Bash(done)",
+      "Bash(npx eslint:*)",
+      "WebFetch(domain:platform.claude.com)"
     ]
   }
 }

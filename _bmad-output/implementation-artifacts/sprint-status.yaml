@@ -35,7 +35,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 
 generated: 2026-03-21
-last_updated: 2026-03-22  # updated: 1-4 → review
+last_updated: 2026-03-23  # updated: 1-7 → review
 project: Flashcards
 project_key: NOKEY
 tracking_system: file-system
@@ -47,10 +47,10 @@ development_status:
   1-1-project-scaffold-and-core-infrastructure-setup: done
   1-2-supabase-foundation-and-auth-infrastructure: done
   1-3-cookie-consent-banner-and-gdpr-consent-storage: done
-  1-4-anonymous-cold-start-deck-study: review
-  1-5-user-registration-google-oauth-and-email-password: ready-for-dev
-  1-6-anonymous-session-upgrade-to-registered-account: ready-for-dev
-  1-7-team-invite-link-signup: ready-for-dev
+  1-4-anonymous-cold-start-deck-study: done
+  1-5-user-registration-google-oauth-and-email-password: review
+  1-6-anonymous-session-upgrade-to-registered-account: done
+  1-7-team-invite-link-signup: review
   1-8-user-login-and-logout: ready-for-dev
   epic-1-retrospective: optional
 

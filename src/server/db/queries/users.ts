@@ -1,7 +1,41 @@
 import { db } from '@/server/db'
-import { profiles } from '@/server/db/schema'
+import { profiles, anonymousSessions } from '@/server/db/schema'
 import { eq } from 'drizzle-orm'
 import type { Result } from '@/types'
+
+type ProfileUpsertData = {
+  tier?: string
+  gdprConsentAt?: Date | null
+  isAdmin?: boolean
+}
+
+/**
+ * Upsert a profile row for a newly registered user.
+ * - INSERT: sets all provided fields including gdprConsentAt
+ * - ON CONFLICT: updates only tier/isAdmin — gdprConsentAt intentionally omitted
+ *   so an existing consent timestamp is NEVER overwritten (GDPR Article 7)
+ */
+export async function upsertProfile(
+  userId: string,
+  data: ProfileUpsertData
+): Promise<void> {
+  const { tier = 'free', gdprConsentAt, isAdmin = false } = data
+  await db
+    .insert(profiles)
+    .values({
+      id: userId,
+      tier,
+      isAdmin,
+      // Pass null explicitly to store NULL; omit entirely when undefined to use column default
+      ...(gdprConsentAt !== undefined ? { gdprConsentAt } : {}),
+    })
+    .onConflictDoUpdate({
+      target: profiles.id,
+      // gdprConsentAt intentionally omitted: INSERT sets it on first signup;
+      // UPDATE must NOT overwrite an existing consent timestamp
+      set: { tier, isAdmin },
+    })
+}
 
 export async function getUserProfile(userId: string): Promise<Result<typeof profiles.$inferSelect>> {
   try {
@@ -29,6 +63,19 @@ export async function updateProfileTier(
   } catch {
     return { data: null, error: { message: 'Database error', code: 'DB_ERROR' } }
   }
+}
+
+/**
+ * Marks an anonymous session as linked (upgraded to a registered account).
+ * Sets linked_at = now() to prevent the purge-anonymous-sessions cron from deleting it.
+ * Idempotent: safe to call multiple times (subsequent calls are no-ops if already set).
+ * Uses Drizzle direct Postgres connection — bypasses RLS (service-role equivalent).
+ */
+export async function markAnonymousSessionLinked(anonUserId: string): Promise<void> {
+  await db
+    .update(anonymousSessions)
+    .set({ linkedAt: new Date() })
+    .where(eq(anonymousSessions.supabaseAnonId, anonUserId))
 }
 
 export async function validateSystemUser(): Promise<void> {

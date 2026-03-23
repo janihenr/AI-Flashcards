@@ -1,6 +1,6 @@
 # Story 1.4: Anonymous Cold Start Deck Study
 
-Status: review
+Status: done
 
 ## Story
 

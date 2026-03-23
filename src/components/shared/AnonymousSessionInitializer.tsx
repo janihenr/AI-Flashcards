@@ -37,6 +37,9 @@ export function AnonymousSessionInitializer() {
         .catch((err) => {
           console.error('[AnonymousSessionInitializer] signInAnonymously failed:', err)
           initStartedRef.current = false
+          // Graceful degradation: allow rating buttons to activate even without a session.
+          // Reviews will fail silently (non-blocking) — same path as a transient SA error.
+          setSessionReady(true)
         })
     })
   }, [setSessionReady])

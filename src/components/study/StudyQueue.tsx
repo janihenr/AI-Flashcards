@@ -6,6 +6,7 @@ import { FlashCard } from './FlashCard'
 import { SessionComplete } from './SessionComplete'
 import { rateAnonymousCard } from '@/app/cold-start/actions'
 import type { CardWithSchedule } from '@/stores/study-session'
+import type { Result } from '@/types'
 
 interface StudyQueueProps {
   /** All cards for the deck — fetched server-side and passed as props */
@@ -47,7 +48,10 @@ export function StudyQueue({ initialCards }: StudyQueueProps) {
   const handleRate = async (rating: 1 | 2 | 3 | 4) => {
     if (isRatingRef.current) return
     isRatingRef.current = true
-    const result = await rateAnonymousCard(currentCard.id, rating)
+    const timeout = new Promise<Result<null>>((resolve) =>
+      setTimeout(() => resolve({ data: null, error: { message: 'Rating save timed out', code: 'TIMEOUT' } }), 5000)
+    )
+    const result = await Promise.race([rateAnonymousCard(currentCard.id, rating), timeout])
     if (result.error) {
       // Non-blocking: log but do not prevent card progression
       console.warn('[StudyQueue] Rating not saved:', result.error.message)

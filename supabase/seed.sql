@@ -12,7 +12,8 @@ INSERT INTO auth.users (
   updated_at,
   is_super_admin,
   encrypted_password
-) VALUES (
+)
+SELECT
   gen_random_uuid(),                        -- COPY THIS UUID → set as SYSTEM_USER_ID env var
   'system@internal.flashcards.app',
   'authenticated',
@@ -21,8 +22,9 @@ INSERT INTO auth.users (
   now(),
   false,
   '!'                                       -- locked account — '!' sentinel prevents all password auth
-)
-ON CONFLICT (email) DO NOTHING;
+WHERE NOT EXISTS (
+  SELECT 1 FROM auth.users WHERE email = 'system@internal.flashcards.app'
+);
 
 -- Insert matching profiles row (ON CONFLICT DO NOTHING for idempotency)
 INSERT INTO profiles (id, display_name, tier, is_admin)

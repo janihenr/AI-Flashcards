@@ -2,7 +2,7 @@
 import { create } from 'zustand'
 import type { CardMode } from '@/types'
 
-interface CardReview {
+export interface CardReview {
   cardId: string
   rating: 1 | 2 | 3 | 4
   responseTimeMs: number
@@ -53,7 +53,7 @@ export const useStudySessionStore = create<StudySessionState>((set, get) => ({
   cardDisplayedAt: null,
   sessionReady: false,
 
-  setCards: (cards) => set({ cards, currentIndex: 0, cardDisplayedAt: Date.now() }),
+  setCards: (cards) => set({ cards, currentIndex: 0, ratings: [], cardDisplayedAt: Date.now() }),
 
   rateCard: (cardId, rating, mode) => {
     const responseTimeMs = Date.now() - (get().cardDisplayedAt ?? Date.now())

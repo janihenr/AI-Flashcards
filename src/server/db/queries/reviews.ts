@@ -1,5 +1,6 @@
 import { db } from '@/server/db'
 import { reviews } from '@/server/db/schema'
+import { eq } from 'drizzle-orm'
 import type { Result } from '@/types'
 
 type CreateReviewInput = {
@@ -16,6 +17,27 @@ export async function createReview(input: CreateReviewInput): Promise<Result<typ
     return { data: review, error: null }
   } catch {
     return { data: null, error: { message: 'Database error', code: 'DB_ERROR' } }
+  }
+}
+
+/**
+ * Transfers all FSRS review rows from an anonymous user to a newly registered user.
+ * Called during anonymous-to-auth upgrade (OAuth only — where user ID changes).
+ * Preserves all FSRS state: stability, difficulty, state, due — nothing is re-seeded.
+ */
+export async function transferAnonymousReviews(
+  anonUserId: string,
+  newUserId: string
+): Promise<Result<{ count: number }>> {
+  try {
+    const updated = await db
+      .update(reviews)
+      .set({ userId: newUserId })
+      .where(eq(reviews.userId, anonUserId))
+      .returning({ id: reviews.id })
+    return { data: { count: updated.length }, error: null }
+  } catch {
+    return { data: null, error: { message: 'Failed to transfer reviews', code: 'DB_ERROR' } }
   }
 }
 

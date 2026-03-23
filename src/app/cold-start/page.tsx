@@ -10,8 +10,15 @@ const COLD_START_CARD_LIMIT = 100
 
 async function AllCardsLoader({ deckId }: { deckId: string }) {
   const result = await findCardsByDeckId(deckId, { limit: COLD_START_CARD_LIMIT })
-  const initialCards: CardWithSchedule[] = result.data?.items ?? []
-  return <StudyQueue initialCards={initialCards} />
+  if (result.error) {
+    return (
+      <div className="w-full max-w-2xl text-center py-12">
+        <p className="text-gray-500 mb-4">Unable to load the study deck. Please try again.</p>
+        <a href="/cold-start" className="text-blue-600 underline text-sm">Refresh</a>
+      </div>
+    )
+  }
+  return <StudyQueue initialCards={result.data.items} />
 }
 
 export default async function ColdStartPage() {

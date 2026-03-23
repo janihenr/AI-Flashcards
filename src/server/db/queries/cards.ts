@@ -51,27 +51,6 @@ export async function findCardsDue(
 }
 
 /**
- * Returns the first card in the given deck, ordered by createdAt ASC (deterministic).
- * Single indexed query — achieves < 1s first card render (NFR-PERF4).
- */
-export async function getFirstDueCard(deckId: string): Promise<Result<typeof cards.$inferSelect>> {
-  try {
-    const [row] = await db
-      .select(getTableColumns(cards))
-      .from(cards)
-      .innerJoin(notes, eq(cards.noteId, notes.id))
-      .where(eq(notes.deckId, deckId))
-      .orderBy(asc(cards.createdAt))
-      .limit(1)
-
-    if (!row) return { data: null, error: { message: 'No cards found', code: 'NOT_FOUND' } }
-    return { data: row, error: null }
-  } catch {
-    return { data: null, error: { message: 'Database error', code: 'DB_ERROR' } }
-  }
-}
-
-/**
  * Returns all cards for a deck, ordered by createdAt ASC with cursor-based pagination.
  * Joins through notes since cards link to decks via notes.
  */
