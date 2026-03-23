@@ -1,5 +1,5 @@
 'use client'
-import { useState, useRef } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import { useCookieConsent } from '@/hooks/useCookieConsent'
 
 export function CookieConsentBanner() {
