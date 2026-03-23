@@ -2,7 +2,6 @@ import { Suspense } from 'react'
 import { StudyQueue } from '@/components/study/StudyQueue'
 import { getSystemDeck } from '@/server/db/queries/decks'
 import { findCardsByDeckId } from '@/server/db/queries/cards'
-import type { CardWithSchedule } from '@/stores/study-session'
 
 // Cold-start deck is a curated system deck — kept under 100 cards by design.
 // If the deck ever exceeds this, add pagination here rather than silently truncating.

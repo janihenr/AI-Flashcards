@@ -20,7 +20,6 @@ export function useCookieConsent() {
       const exp = typeof expiresAt === 'string' ? parseInt(expiresAt as string, 10) : expiresAt
       if (isNaN(exp)) resetConsent()
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   return {
