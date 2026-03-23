@@ -8,6 +8,7 @@ export function useCookieConsent() {
 
   // isLoaded = false on SSR and first render; true only after client hydration
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- hydration guard: setIsLoaded(true) on mount is the standard pattern to prevent SSR/CSR mismatch
     setIsLoaded(true)
     const { consentGiven, expiresAt, resetConsent } = useCookieConsentStore.getState()
     // Check expiry on mount — reset if consent has expired (triggers banner re-appearance)
