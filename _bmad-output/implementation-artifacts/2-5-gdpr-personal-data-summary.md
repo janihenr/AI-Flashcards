@@ -1,6 +1,6 @@
 # Story 2.5: GDPR Personal Data Summary
 
-Status: ready-for-dev
+Status: done
 
 ## Story
 
@@ -32,7 +32,7 @@ So that I understand what personal data the system holds.
 
 ### Task 1: Add data summary queries to the privacy page (AC: #1, #2)
 
-- [ ] Modify `src/app/(app)/settings/privacy/page.tsx` to add four Drizzle count queries and one Supabase admin session count — run in parallel via `Promise.all` for performance:
+- [x] Modify `src/app/(app)/settings/privacy/page.tsx` to add four Drizzle count queries and one Supabase admin session count — run in parallel via `Promise.all` for performance:
 
   ```typescript
   import { count, eq, isNull, and } from 'drizzle-orm'
@@ -71,11 +71,11 @@ So that I understand what personal data the system holds.
 
   Note: `adminClient` is already constructed in the page for the data export signed URL — reuse the same instance, do NOT call `createServerAdminClient()` twice. Place `Promise.all` after `adminClient` is created.
 
-- [ ] Pass summary data to `<DataSummarySection>` as props (see Task 2).
+- [x] Pass summary data to `<DataSummarySection>` as props (see Task 2).
 
 ### Task 2: Create `DataSummarySection` component (AC: #1, #2, #3)
 
-- [ ] Create `src/components/privacy/DataSummarySection.tsx` (Server Component — no client state, no actions):
+- [x] Create `src/components/privacy/DataSummarySection.tsx` (Server Component — no client state, no actions):
 
   Props interface:
   ```typescript
@@ -173,7 +173,7 @@ So that I understand what personal data the system holds.
 
 ### Task 3: Wire up the section in the privacy page (AC: #1, #2, #3)
 
-- [ ] In `src/app/(app)/settings/privacy/page.tsx`, add the summary section below the export section:
+- [x] In `src/app/(app)/settings/privacy/page.tsx`, add the summary section below the export section:
 
   ```tsx
   import { DataSummarySection } from '@/components/privacy/DataSummarySection'
@@ -216,7 +216,7 @@ So that I understand what personal data the system holds.
 
 ### Task 4: Tests (AC: #1, #2, #3)
 
-- [ ] Create `tests/integration/data-summary.test.ts`:
+- [x] Create `tests/integration/data-summary.test.ts`:
 
   Key test cases:
   - When profile has `formatPreferences = null` → `hasFormatPreferences: false`
@@ -383,6 +383,19 @@ claude-sonnet-4-6
 
 ### Debug Log References
 
+N/A — no errors or debugging required.
+
 ### Completion Notes List
 
+- `adminClient` was hoisted to the top of `PrivacySettingsPage` (before `Promise.all`) so it could be reused for both the sessions count query and the conditional signed-URL generation — no double-instantiation.
+- All 6 DB queries (jobs, profiles, 4 counts) plus the admin sessions query run in a single `Promise.all` for parallel execution.
+- Integration tests use React element tree traversal (inspecting `React.ReactElement.props`) rather than rendering, keeping the test environment pure Node.js without jsdom.
+
 ### File List
+
+**New files:**
+- `src/components/privacy/DataSummarySection.tsx`
+- `tests/integration/data-summary.test.ts`
+
+**Modified files:**
+- `src/app/(app)/settings/privacy/page.tsx`

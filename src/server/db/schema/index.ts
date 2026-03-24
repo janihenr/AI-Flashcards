@@ -1,5 +1,6 @@
 export * from './users'
 export * from './decks'
+export * from './notes'
 export * from './cards'
 export * from './reviews'
 export * from './teams'

@@ -67,6 +67,28 @@ const _getSystemDeckCached = unstable_cache(
   { tags: ['system-deck'], revalidate: 3600 }
 )
 
+export async function createDeck(
+  userId: string,
+  data: { title: string; subject?: string | null }
+): Promise<Result<{ id: string }>> {
+  try {
+    const [row] = await db
+      .insert(decks)
+      .values({
+        userId,
+        title: data.title,
+        subject: data.subject ?? null,
+      })
+      .returning({ id: decks.id })
+
+    if (!row) return { data: null, error: { message: 'Database error', code: 'DB_ERROR' } }
+    return { data: { id: row.id }, error: null }
+  } catch (err) {
+    console.error('[createDeck] DB error:', err)
+    return { data: null, error: { message: 'Database error', code: 'DB_ERROR' } }
+  }
+}
+
 export async function getDeckById(deckId: string): Promise<Result<typeof decks.$inferSelect>> {
   try {
     const deck = await db.query.decks.findFirst({

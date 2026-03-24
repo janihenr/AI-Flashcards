@@ -35,7 +35,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 
 generated: 2026-03-21
-last_updated: 2026-03-24  # updated: 2-1 → done; 2-3 → done (code review complete); 2-4 → done (E2E deferred to later phase, blocked on login)
+last_updated: 2026-03-24  # updated: epic-2 → done; epic-2-retrospective → done; epic-3 → in-progress; 3-1 → review; 3-2 → ready-for-dev; 3-2 → in-progress; 3-3 → ready-for-dev
 project: Flashcards
 project_key: NOKEY
 tracking_system: file-system
@@ -55,23 +55,24 @@ development_status:
   epic-1-retrospective: done
 
   # ─── Epic 2: Account Management & GDPR ───
-  epic-2: in-progress
+  epic-2: done
   2-1-profile-information-update: done
   2-2-password-change: done
   2-3-active-session-view-and-revocation: done
   2-4-gdpr-personal-data-export: done
-  2-5-gdpr-personal-data-summary: ready-for-dev
-  2-6-account-deletion-request: backlog
-  epic-2-retrospective: optional
+  2-5-gdpr-personal-data-summary: done
+  2-6-account-deletion-request: done
+  epic-2-retrospective: done
 
   # ─── Epic 3: Deck & Card Library ───
-  epic-3: backlog
-  3-1-create-a-new-flashcard-deck: backlog
-  3-2-add-cards-to-a-deck-manually: backlog
-  3-3-edit-and-delete-individual-cards: backlog
+  epic-3: in-progress
+  3-1-create-a-new-flashcard-deck: review
+  3-2-add-cards-to-a-deck-manually: review
+  3-3-edit-and-delete-individual-cards: ready-for-dev
   3-4-delete-a-deck: backlog
   3-5-personal-deck-library-view: backlog
   3-6-share-deck-via-invite-link: backlog
+  3-7-marketing-landing-page: ready-for-dev
   epic-3-retrospective: optional
 
   # ─── Epic 4: Study Sessions & Spaced Repetition ───

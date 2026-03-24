@@ -6,6 +6,8 @@ export const ErrorCodes = {
   NOT_FOUND: 'NOT_FOUND',
   STRIPE_WEBHOOK_DUPLICATE: 'STRIPE_WEBHOOK_DUPLICATE',
   EXPORT_IN_PROGRESS: 'EXPORT_IN_PROGRESS',
+  DELETION_FAILED: 'DELETION_FAILED',
+  ACCOUNT_DELETED: 'ACCOUNT_DELETED',
 } as const
 
 export type ErrorCode = typeof ErrorCodes[keyof typeof ErrorCodes]

@@ -8,8 +8,7 @@ import {
   pgEnum,
   index,
 } from 'drizzle-orm/pg-core'
-// C3: notes is co-located in decks.ts — import from './decks', NOT './notes'
-import { notes } from './decks'
+import { notes } from './notes'
 import { profiles } from './users'
 
 export const cardModeEnum = pgEnum('card_mode', ['qa', 'image', 'context-narrative'])

@@ -6,7 +6,7 @@ interface LogEntry {
   action: string // dot-notation: 'ai.generate.deck', 'stripe.webhook.received'
   userId?: string
   role?: string
-  timestamp: string
+  timestamp?: string
   durationMs?: number
   error?: string | Error
   stack?: string

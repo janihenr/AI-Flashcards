@@ -4,6 +4,7 @@ type AppEvent =
   | 'cold_start_viewed'
   | 'signup'
   | 'deck_created'
+  | 'card_added'
   | 'ai_generation_used'
   | 'study_session_started'
   | 'study_session_completed'

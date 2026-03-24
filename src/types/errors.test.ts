@@ -31,8 +31,16 @@ describe('ErrorCodes', () => {
     expect(ErrorCodes.EXPORT_IN_PROGRESS).toBe('EXPORT_IN_PROGRESS')
   })
 
-  it('has exactly 7 error codes', () => {
-    expect(Object.keys(ErrorCodes)).toHaveLength(7)
+  it('has DELETION_FAILED', () => {
+    expect(ErrorCodes.DELETION_FAILED).toBe('DELETION_FAILED')
+  })
+
+  it('has ACCOUNT_DELETED', () => {
+    expect(ErrorCodes.ACCOUNT_DELETED).toBe('ACCOUNT_DELETED')
+  })
+
+  it('has exactly 9 error codes', () => {
+    expect(Object.keys(ErrorCodes)).toHaveLength(9)
   })
 
   it('all values equal their keys (self-referential registry)', () => {

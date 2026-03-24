@@ -12,7 +12,7 @@ export type DisplayNameInput = z.infer<typeof displayNameSchema>
  * Validates a display name input. Returns a Zod SafeParseResult so the
  * caller can access both the parsed value and any error messages.
  */
-export function validateDisplayNameInput(value: unknown): z.SafeParseReturnType<string> {
+export function validateDisplayNameInput(value: unknown): ReturnType<typeof displayNameSchema.safeParse> {
   return displayNameSchema.safeParse(value)
 }
 

@@ -6,6 +6,9 @@ export type Result<T> =
   | { data: null; error: { message: string; code?: string } }
 
 export type CardMode = 'qa' | 'image' | 'context-narrative'
+
+// User subscription tier — mirrors the text values stored in profiles.tier
+export type ProfileTier = 'anonymous' | 'free' | 'pro' | 'team_member' | 'team_admin'
 // qa:                front = question text, back = answer text
 // image:             front = image (imageUrl required), back = label/explanation
 // context-narrative: front = scenario/story framing, back = answer/resolution

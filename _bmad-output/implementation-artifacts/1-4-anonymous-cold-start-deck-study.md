@@ -485,6 +485,8 @@ None — implementation proceeded without blockers.
 - `sessionReady` state added to `useStudySessionStore` to coordinate between `AnonymousSessionInitializer` (sets it true after sign-in) and `StudyQueue`/`FlashCard` (disables rating buttons until true).
 - `reviews.presentationMode` and `reviews.responseTimeMs` made nullable via schema update + migration `0001_reviews_nullable_anonymous_fields.sql`. Anonymous reviews omit these fields per GDPR legitimate interest constraint.
 - `getSystemDeck()` uses `SYSTEM_USER_ID` env var (set after seed run) with `unstable_cache` (1hr TTL, `system-deck` tag).
+- **[2026-03-24 course correction]** Story 3-7 (Marketing Landing Page) formalizes `/` as the marketing landing page. Anonymous visitors reach `/cold-start` via the "Try a demo deck" CTA on the landing page, not directly via `/`. The cold-start implementation at `/cold-start` is unchanged. The AC phrase "land on the app homepage" predates the marketing route group decision and is now outdated — no code change required.
+- **[2026-03-24 course correction]** `cold_start_viewed` analytics event was defined in `AppEvent` (Story 1-1) but was not fired in the cold-start page. This is a missing implementation per FR58 + Definition of Done. Fixed in Story 3-7: `trackEvent('cold_start_viewed', {})` added to `src/app/cold-start/page.tsx`.
 - `getFirstDueCard()` and `findCardsByDeckId()` join through `notes` table (cards link to decks via notes, not directly).
 - `rateAnonymousCard` Server Action derives userId server-side from `supabase.auth.getUser()` — never from caller params.
 - 43 unit tests pass, 0 regressions. TypeScript: 0 errors in new files (4 pre-existing errors in other files not introduced by this story).

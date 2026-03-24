@@ -40,7 +40,7 @@ export function AvatarUpload({ currentAvatarUrl, userId, displayName }: Props) {
 
     setError(null)
 
-    if (!ACCEPTED_TYPES.includes(file.type)) {
+    if (!ACCEPTED_TYPES.includes(file.type as (typeof ACCEPTED_TYPES)[number])) {
       setError('Please upload a JPEG, PNG, or WebP image.')
       return
     }

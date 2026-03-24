@@ -1,5 +1,5 @@
 ---
-stepsCompleted: [1, 2, 3]
+stepsCompleted: [1, 2, 3, 4]
 inputDocuments:
   - _bmad-output/planning-artifacts/prd.md
   - _bmad-output/planning-artifacts/epics.md
@@ -280,6 +280,101 @@ Nothing else. No last-studied date, no card count.
 | Sticky "Add & next" above keyboard + auto-focus | Must-have |
 | Session pacing arc + algorithm signal at 5 sessions | Should-have |
 | Weak card mode as post-session bonus (not tab) | Should-have |
+
+---
+
+## Desired Emotional Response
+
+### Primary Emotional Goals
+
+**Product identity north star: Quiet confidence** — the feeling that you're genuinely getting smarter without working hard at it. Not the dopamine spike of a game score, not the relief of completing homework. Something more durable: *I'm actually retaining this.*
+
+This differentiates Flashcards from every competitor:
+- Duolingo → excitement and streak anxiety (dopamine/guilt loop)
+- Anki → control and mastery (satisfaction/overwhelm depending on user type)
+- **Flashcards → quiet confidence (competence accumulating)**
+
+**In-product emotional arc:** A single north star emotion isn't the right model for a multi-session product. The arc is deliberate and stage-based:
+
+| Stage | Target emotion | Why |
+|-------|---------------|-----|
+| Sessions 1–2 (new user) | **Effortlessness** | Remove every barrier; the product should feel surprising in how little friction it has |
+| Sessions 3–7 (early habit) | **Curiosity** | Shapeshifter Cards, Learning Fingerprint signals, varied card formats keep the loop interesting |
+| Session 8+ (retained user) | **Quiet confidence** | Progress visible; Depth Score moves; user knows it's working |
+| After a real-world recall | **Mastery** | "I used this in real life" — highest emotional peak, highest word-of-mouth trigger |
+| Re-engagement (after break) | **Trust** | System remembered them, nothing is broken, no penalty |
+
+### Emotional Journey Mapping
+
+| Moment | User | Target emotion | Design lever |
+|--------|------|---------------|--------------|
+| First card flip | Sofia | Curiosity — "what's on the other side?" | Deliberate flip animation, card weight |
+| Correct recall | Sofia | Satisfaction — "I knew that" | Implicit rating auto-advances smoothly, no fanfare |
+| Session completion | Sofia | Accomplishment + anticipation | Depth Score with "your starting point" framing + next-visit hook |
+| Returning after a break | Marcus | Relief/Trust — "my progress is still here" | "Welcome back — your cards waited" screen, no penalty state |
+| Depth Score improves | Marcus | Mastery — "I can see it working" | Animated number transition, specific (45% → 61%) |
+| First deck created | Sofia | Momentum — "that was fast" | Sub-3-min creation, immediate study CTA |
+| Weak card bonus round | Marcus | Agency — "I'm fixing the gaps" | Opt-in framing, visually distinct session |
+| Opening pre-assigned deck | James | Clarity — "I know exactly what to do" | Single-deck bypass to deck detail, zero setup |
+
+### Micro-Emotions
+
+**Confidence → not Confusion**
+Every interaction must have an obvious next step. Physical flashcard metaphor, "6 cards ready — 4 min" CTA, sticky "Add & next" — all designed to eliminate "what do I do now?"
+
+**Trust → not Scepticism**
+"Invisible by default, transparent on demand" directly addresses this. Marcus's re-engagement moment is the highest-risk trust point.
+
+**Satisfaction → not Excitement**
+Satisfaction is quiet and durable. Excitement fades and demands escalation. Depth Score animations are satisfying, not exciting — a number moving is enough. No confetti, no level-up sounds.
+
+**Accomplishment → not Frustration**
+Session completion must feel earned, not interrupted. No "Are you sure?" quit confirmation. "Add & next" auto-focus prevents creation frustration on mobile.
+
+**Belonging → not Isolation** *(team context)*
+James needs to feel his studying matters. "Your progress is shared with [admin]" on completion turns solitary activity into connected contribution.
+
+### Design Implications
+
+| Target emotion | UX design approach |
+|---------------|-------------------|
+| Effortlessness (sessions 1–2) | Zero required actions; implicit rating; sub-3-min creation; no empty library |
+| Curiosity (sessions 3–7) | Varied card formats via Shapeshifter; Learning Fingerprint signal surfaced at session 5+ |
+| Quiet confidence (session 8+) | Depth Score as primary metric; animated improvement transitions; no streaks |
+| Mastery (real-world recall) | Shareable Depth Score progress card (post-MVP); per-deck retention history |
+| Trust (re-engagement) | "Welcome back" screen; scheduling transparency escape hatch; no penalty state |
+
+### Emotions to Avoid
+
+| Emotion | Where it risks appearing | Prevention |
+|---------|------------------------|------------|
+| Guilt | Return after a break | No streak counter, no "you missed X days", welcome-back screen |
+| Performance anxiety | Depth Score on first session, mid-session | "Your starting point" framing; no visible score during session |
+| Overwhelm | Large deck library | Sorted by due cards; algorithm invisible; "cards ready" not "cards total" |
+| Confusion | New user, card editor | Physical flashcard metaphor; contextual prompts on first use |
+| Abandonment anxiety | Session ends early | No confirmation modal; progress persisted; no penalty |
+
+### Emotional Design Principles
+
+1. **Design for the right stage, not a single emotion** — effortlessness for new users, curiosity for early habit, quiet confidence for retained users, mastery as the ceiling
+2. **Quiet > loud** — satisfaction through subtle, specific feedback (a number changing) beats spectacle (confetti, badges, streaks)
+3. **Trust is earned through memory** — the system remembering the user (their progress, their break, their weak cards) is the primary trust mechanism
+4. **Agency over automation** — implicit intelligence only feels positive when the user can override it; invisible control creates anxiety, not ease
+
+### Root Cause Analysis: Why Avoided Emotions Still Risk Appearing
+
+**Guilt risk lives outside the app (5 Whys finding)**
+The welcome-back screen fixes in-app guilt but leaves pre-open anxiety unsolved. The guilt happens before the user opens the app — triggered by the icon on their phone. Re-engagement emails and push notifications must carry the same anti-guilt tone as the in-app welcome screen.
+- ❌ Not: "You have 14 cards waiting!"
+- ✅ Yes: "Your deck is exactly where you left it — no catch-up needed."
+
+**Performance anxiety: Depth Score session-1 state (5 Whys finding)**
+Percentages are universally conditioned as test scores. The number is read before the framing copy. "Your starting point" text fails because the eye hits the number first.
+- **Solution:** Session 1 completion shows an *empty ring* with a seedling/planted metaphor — not a percentage. Copy: "You've planted 12 cards. Watch them grow." The percentage appears from session 2 onward, after the user has context for what it means.
+
+**Confusion: Flip affordance is assumed, not communicated (5 Whys finding)**
+A flat rectangle on screen doesn't signal "I have another side." The physical flashcard metaphor fails in 2D without a depth cue. Users who haven't used physical flashcards won't know to attempt a flip.
+- **Solution:** Subtle 3D shadow/edge on card component to suggest physicality. One-time "write the back →" nudge with a flip icon on first card creation — disappears after first use, never shown again.
 
 ---
 

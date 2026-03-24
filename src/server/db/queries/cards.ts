@@ -1,9 +1,40 @@
-import { eq, asc, and, gt, or, getTableColumns } from 'drizzle-orm'
+import { eq, asc, and, gt, or, isNull, getTableColumns } from 'drizzle-orm'
 import { db } from '@/server/db'
 import { cards, notes } from '@/server/db/schema'
 import type { Result } from '@/types'
+import type { CardMode } from '@/types'
 import type { PaginationInput, PaginationResult } from '@/lib/pagination'
 import { encodeCursor, decodeCursor } from '@/lib/pagination'
+
+type TxContext = Parameters<Parameters<typeof db.transaction>[0]>[0]
+
+export async function createCard(
+  userId: string,
+  noteId: string,
+  data: { front: string; back: string; imageUrl?: string | null },
+  tx?: TxContext
+): Promise<Result<{ id: string }>> {
+  const executor = tx ?? db
+  const mode: CardMode = data.imageUrl ? 'image' : 'qa'
+  try {
+    const [row] = await executor
+      .insert(cards)
+      .values({
+        userId,
+        noteId,
+        mode,
+        frontContent: data.front,
+        backContent: data.back,
+        imageUrl: data.imageUrl ?? null,
+      })
+      .returning({ id: cards.id })
+    if (!row) return { data: null, error: { message: 'Database error', code: 'DB_ERROR' } }
+    return { data: { id: row.id }, error: null }
+  } catch (err) {
+    console.error('[createCard] DB error:', err)
+    return { data: null, error: { message: 'Database error', code: 'DB_ERROR' } }
+  }
+}
 
 export async function findCardsDue(
   userId: string,
@@ -82,7 +113,7 @@ export async function findCardsByDeckId(
       .select(getTableColumns(cards))
       .from(cards)
       .innerJoin(notes, eq(cards.noteId, notes.id))
-      .where(and(eq(notes.deckId, deckId), cursorCondition))
+      .where(and(eq(notes.deckId, deckId), isNull(notes.deletedAt), cursorCondition))
       .orderBy(asc(cards.createdAt), asc(cards.id))
       .limit(limit + 1)
 

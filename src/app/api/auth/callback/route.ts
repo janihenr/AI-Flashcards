@@ -1,6 +1,9 @@
 import { NextResponse } from 'next/server'
 import { cookies } from 'next/headers'
+import { eq } from 'drizzle-orm'
 import { createUserClient } from '@/lib/supabase/user'
+import { db } from '@/server/db'
+import { profiles } from '@/server/db/schema'
 import { upsertProfile, markAnonymousSessionLinked } from '@/server/db/queries/users'
 import { completeAnonymousUpgrade } from '@/server/actions/upgrade'
 import { acceptTeamInvite } from '@/app/(auth)/invite/[token]/actions'
@@ -56,6 +59,24 @@ export async function GET(request: Request) {
 
   if (error || !data.user) {
     return buildRedirect(origin, request, '/login?error=auth_failed')
+  }
+
+  // Guard: block re-login for soft-deleted accounts (GDPR account deletion, Story 2.6)
+  // Must run before any flow branch — deleted users must not access any (app) routes.
+  // DB failure is non-fatal: allow the flow to continue rather than breaking all OAuth logins.
+  try {
+    const [profileRow] = await db
+      .select({ deletedAt: profiles.deletedAt })
+      .from(profiles)
+      .where(eq(profiles.id, data.user.id))
+      .limit(1)
+    if (profileRow?.deletedAt !== null && profileRow?.deletedAt !== undefined) {
+      await supabase.auth.signOut({ scope: 'local' })
+      return buildRedirect(origin, request, '/account-deleted')
+    }
+  } catch (err) {
+    console.error('[auth/callback] deleted-account guard DB query failed:', err)
+    // Continue: login proceeds; guard will re-run on next request
   }
 
   const cookieStore = await cookies()

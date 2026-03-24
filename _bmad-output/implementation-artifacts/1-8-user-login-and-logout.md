@@ -301,6 +301,7 @@ claude-sonnet-4-6
 - Recovery session guard uses browser Supabase client to check session validity on /reset-password?step=update
 - Middleware now captures getUser() result and redirects unauthenticated users from protected routes with ?redirectTo param
 - Auth callback's redirectTo handling was already implemented in Story 1.5 — verified and confirmed working
+- **[2026-03-24 course correction]** Story 3-7 (Marketing Landing Page) changes what `/` renders for unauthenticated users. Post-logout redirect to `/` (`AppNav: router.push('/')`) now lands on the marketing landing page, not the cold-start experience. AC 3 phrase "(cold start experience)" is outdated — the code is correct and requires no change.
 - All 15 E2E tests pass; 0 accessibility violations on login page
 
 ### File List
