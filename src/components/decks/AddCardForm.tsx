@@ -27,6 +27,7 @@ export function AddCardForm({ deckId, deckTitle }: AddCardFormProps) {
     if (state?.data?.id && state.data.id !== lastSuccessId.current) {
       lastSuccessId.current = state.data.id
       formRef.current?.reset()
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setImageError(null)
       // Defer focus until after DOM update
       setTimeout(() => frontInputRef.current?.focus(), 0)
