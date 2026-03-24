@@ -87,7 +87,26 @@
       "Bash(do git:*)",
       "Bash(done)",
       "Bash(npx eslint:*)",
-      "WebFetch(domain:platform.claude.com)"
+      "WebFetch(domain:platform.claude.com)",
+      "Bash(DATABASE_URL=postgresql://postgres:postgres@127.0.0.1:54322/postgres pnpm test tests/integration/)",
+      "Bash(pnpm test:e2e)",
+      "Bash(Invoke-WebRequest -Uri \"http://localhost:3000/cold-start\" -Method Head -TimeoutSec 3)",
+      "Bash(Select-Object StatusCode)",
+      "Bash(DATABASE_URL=postgresql://postgres:postgres@127.0.0.1:54322/postgres pnpm test tests/integration/ --reporter=verbose 2>&1)",
+      "mcp__supabase__list_migrations",
+      "Bash(DATABASE_URL=\"postgresql://postgres:postgres@127.0.0.1:54322/postgres\" pnpm test tests/integration/team-invite-acceptance.test.ts)",
+      "Bash(2)",
+      "Bash(cd:*)",
+      "Bash(taskkill /PID 50316 /F)",
+      "Bash(echo $PATH)",
+      "Bash(netstat -ano)",
+      "Bash(kill -9 50316)",
+      "Bash(wmic process:*)",
+      "mcp__supabase__apply_migration",
+      "Bash(grep '\"\"zod\"\"' package.json)",
+      "Bash(test -d \"C:\\\\Users\\\\janihenr\\\\Projektit\\\\BMAD\\\\Flashcards/src/app/\\(app\\)/settings/privacy/\")",
+      "Bash(ls \"C:/Users/janihenr/Projektit/BMAD/Flashcards/src/app/\\(app\\)/settings/\")",
+      "Bash(ls -la \"C:\\\\Users\\\\janihenr\\\\Projektit\\\\BMAD\\\\Flashcards/src/app/\\(app\\)/settings/privacy/\")"
     ]
   }
 }

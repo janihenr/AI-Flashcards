@@ -19,9 +19,10 @@ import { validateInviteToken, addTeamMember } from '@/server/db/queries/teams'
 const hasDb = !!process.env.DATABASE_URL && !process.env.DATABASE_URL.includes('placeholder')
 
 function makeTestIds() {
-  const ts = Date.now().toString(36)
-  const r = Math.random().toString(36).slice(2, 8)
-  const fill = `${ts}${r}`.padEnd(12, '0').slice(0, 12)
+  // UUID node section must be 12 hex chars (0-9, a-f) — base-36 would include invalid chars
+  const tsPart = (Date.now() & 0xffffff).toString(16).padStart(6, '0')
+  const rPart = Math.floor(Math.random() * 0xffffff).toString(16).padStart(6, '0')
+  const fill = `${tsPart}${rPart}`
   return {
     ownerId: `00000000-0000-0000-aa00-${fill}`,
     userId1: `00000000-0000-0000-bb00-${fill}`,

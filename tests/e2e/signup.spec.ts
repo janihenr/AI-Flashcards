@@ -41,10 +41,16 @@ test.describe('Signup Page', () => {
     await page.getByLabel(/email/i).fill('test@example.com')
     await page.getByLabel(/password/i).fill('short')
 
-    // Intercept any network requests to server actions — none should fire
+    // Block any POST requests — none should reach the server for a client-side validation error.
+    // page.route() intercepts before the request leaves the browser, making the assertion reliable.
     let serverCallMade = false
-    page.on('request', (req) => {
-      if (req.method() === 'POST') serverCallMade = true
+    await page.route('**', (route) => {
+      if (route.request().method() === 'POST') {
+        serverCallMade = true
+        route.abort()
+      } else {
+        route.continue()
+      }
     })
 
     await page.getByRole('button', { name: /create account/i }).click()
@@ -54,19 +60,16 @@ test.describe('Signup Page', () => {
   })
 
   test('successful email signup shows check-email message', async ({ page }) => {
-    // Note: This test requires a running Supabase instance.
-    // In CI without Supabase, this test is skipped or mocked.
-    // The form flow is tested here; actual email delivery is manually verified.
+    // Requires a running Supabase instance. Skip in CI environments without one.
+    // The SUPABASE_URL env var is checked as a proxy for Supabase availability.
+    test.skip(!process.env.SUPABASE_URL, 'Skipped: no live Supabase instance available')
+
     await page.getByLabel(/terms of service/i).click()
     await page.getByLabel(/email/i).fill(`test+${Date.now()}@example.com`)
     await page.getByLabel(/password/i).fill('ValidPass123!')
     await page.getByRole('button', { name: /create account/i }).click()
 
-    // After submission, should show check email message (or error if Supabase unavailable)
-    // We accept either outcome in test environments without live Supabase
-    const checkEmailMsg = page.getByRole('heading', { name: /check your email/i })
-    const errorMsg = page.getByRole('alert')
-    await expect(checkEmailMsg.or(errorMsg)).toBeVisible({ timeout: 10000 })
+    await expect(page.getByRole('heading', { name: /check your email/i })).toBeVisible({ timeout: 10000 })
   })
 
   test('Google OAuth button present and enabled after ToS checked', async ({ page }) => {

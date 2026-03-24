@@ -20,11 +20,16 @@ test.describe('Story 1.6 — Cold Start Upgrade CTA (AC#1)', () => {
       await card.click()
 
       const goodBtn = page.getByRole('button', { name: /Good/i })
-      await expect(goodBtn).toBeEnabled({ timeout: 10000 })
+      await expect(goodBtn).toBeEnabled({ timeout: 30000 })
       await goodBtn.click()
+
+      // handleRate is async — wait for card to advance before next iteration
+      if (i < 9) {
+        await expect(page.getByText('Click to reveal')).toBeVisible({ timeout: 30000 })
+      }
     }
 
-    await expect(page.getByText('Session Complete!')).toBeVisible({ timeout: 5000 })
+    await expect(page.getByText('Session Complete!')).toBeVisible({ timeout: 30000 })
 
     const upgradeCta = page.getByRole('link', { name: /sign up to save progress/i })
     await expect(upgradeCta).toBeVisible()
@@ -39,11 +44,16 @@ test.describe('Story 1.6 — Cold Start Upgrade CTA (AC#1)', () => {
       await expect(card).toBeVisible({ timeout: 5000 })
       await card.click()
       const goodBtn = page.getByRole('button', { name: /Good/i })
-      await expect(goodBtn).toBeEnabled({ timeout: 10000 })
+      await expect(goodBtn).toBeEnabled({ timeout: 30000 })
       await goodBtn.click()
+
+      // handleRate is async — wait for card to advance before next iteration
+      if (i < 9) {
+        await expect(page.getByText('Click to reveal')).toBeVisible({ timeout: 30000 })
+      }
     }
 
-    await expect(page.getByText('Session Complete!')).toBeVisible({ timeout: 5000 })
+    await expect(page.getByText('Session Complete!')).toBeVisible({ timeout: 30000 })
     await expect(page.getByRole('link', { name: /explore more decks/i })).toBeVisible()
   })
 })

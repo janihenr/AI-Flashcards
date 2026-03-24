@@ -16,6 +16,7 @@ export const profiles = pgTable('profiles', {
   // FK is enforced by Supabase via trigger. Do NOT add .references() here.
   id:               uuid('id').primaryKey(),
   displayName:      text('display_name'),
+  avatarUrl:        text('avatar_url'),
   tier:             text('tier').notNull().default('free'),       // 'anonymous'|'free'|'pro'|'team_member'|'team_admin'
   previousTier:     text('previous_tier'),                        // nullable — stores tier before team join
   isAdmin:          boolean('is_admin').notNull().default(false),

@@ -23,10 +23,10 @@ const hasDb = !!process.env.DATABASE_URL && !process.env.DATABASE_URL.includes('
 
 // Helper UUIDs for test data — each test creates its own isolated rows
 function makeTestIds() {
-  const ts = Date.now().toString(36)
-  const r = Math.random().toString(36).slice(2, 8)
-  // Produce valid UUIDs by filling in a deterministic pattern
-  const fill = `${ts}${r}`.padEnd(12, '0').slice(0, 12)
+  // UUID node section must be 12 hex chars (0-9, a-f) — base-36 would include invalid chars
+  const tsPart = (Date.now() & 0xffffff).toString(16).padStart(6, '0')
+  const rPart = Math.floor(Math.random() * 0xffffff).toString(16).padStart(6, '0')
+  const fill = `${tsPart}${rPart}`
   return {
     anonUserId: `00000000-0000-0000-aaaa-${fill}`,
     newUserId: `00000000-0000-0000-bbbb-${fill}`,

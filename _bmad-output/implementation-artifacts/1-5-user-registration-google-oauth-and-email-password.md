@@ -1,6 +1,6 @@
 # Story 1.5: User Registration — Google OAuth & Email/Password
 
-Status: review
+Status: done
 
 ## Story
 

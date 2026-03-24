@@ -160,7 +160,7 @@ function SignupPageContent() {
                   <Checkbox
                     checked={field.value === true}
                     onCheckedChange={(checked) => {
-                      field.onChange(checked === true ? true : undefined)
+                      field.onChange(checked === true)
                     }}
                     aria-label="Accept Terms of Service"
                   />
@@ -226,7 +226,7 @@ function SignupPageContent() {
 
 export default function SignupPage() {
   return (
-    <Suspense>
+    <Suspense fallback={<div className="w-full max-w-md h-64 animate-pulse rounded-lg bg-muted" />}>
       <SignupPageContent />
     </Suspense>
   )

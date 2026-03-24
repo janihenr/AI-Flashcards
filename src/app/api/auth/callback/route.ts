@@ -7,13 +7,21 @@ import { acceptTeamInvite } from '@/app/(auth)/invite/[token]/actions'
 
 // Use x-forwarded-host in production to avoid Vercel load-balancer URL as origin.
 // Validates the header against NEXT_PUBLIC_APP_URL to prevent open-redirect via header injection.
+// If NEXT_PUBLIC_APP_URL is missing in production, falls back to origin (never trusts x-forwarded-host
+// unvalidated — a misconfigured env var must not silently open a redirect vector).
 function buildRedirect(origin: string, request: Request, path: string): NextResponse {
   if (process.env.NODE_ENV === 'development') {
     return NextResponse.redirect(`${origin}${path}`)
   }
   const forwardedHost = request.headers.get('x-forwarded-host')
   const appUrl = process.env.NEXT_PUBLIC_APP_URL
-  if (forwardedHost && appUrl) {
+  if (!appUrl) {
+    // NEXT_PUBLIC_APP_URL not configured — fall back to origin rather than trusting
+    // an unvalidated x-forwarded-host header.
+    console.error('[auth/callback] NEXT_PUBLIC_APP_URL is not set; x-forwarded-host validation skipped')
+    return NextResponse.redirect(`${origin}${path}`)
+  }
+  if (forwardedHost) {
     const expectedHost = new URL(appUrl).host
     if (forwardedHost === expectedHost) {
       return NextResponse.redirect(`https://${forwardedHost}${path}`)
@@ -56,6 +64,15 @@ export async function GET(request: Request) {
   // Clear upgrade cookie if present (stale from an aborted upgrade attempt)
   if (type === 'recovery') {
     const response = buildRedirect(origin, request, '/reset-password?step=update')
+    // Set a short-lived client-readable cookie so the update form can confirm this is a
+    // genuine recovery session (not a regular logged-in user navigating to ?step=update).
+    response.cookies.set('recovery_flow', '1', {
+      httpOnly: false, // must be readable by the client component
+      maxAge: 600,     // 10 minutes — ample time to complete the form
+      sameSite: 'lax',
+      path: '/reset-password',
+      secure: process.env.NODE_ENV === 'production',
+    })
     if (cookieStore.get('anon_upgrade_id')) {
       response.cookies.delete('anon_upgrade_id')
     }

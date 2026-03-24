@@ -27,8 +27,12 @@ describe('ErrorCodes', () => {
     expect(ErrorCodes.STRIPE_WEBHOOK_DUPLICATE).toBe('STRIPE_WEBHOOK_DUPLICATE')
   })
 
-  it('has exactly 6 error codes', () => {
-    expect(Object.keys(ErrorCodes)).toHaveLength(6)
+  it('has EXPORT_IN_PROGRESS', () => {
+    expect(ErrorCodes.EXPORT_IN_PROGRESS).toBe('EXPORT_IN_PROGRESS')
+  })
+
+  it('has exactly 7 error codes', () => {
+    expect(Object.keys(ErrorCodes)).toHaveLength(7)
   })
 
   it('all values equal their keys (self-referential registry)', () => {

@@ -45,8 +45,25 @@ export async function middleware(request: NextRequest, context: NextFetchEvent) 
 
   // CRITICAL: use getUser() — validates with Supabase server
   // NEVER use getSession() — reads cookie without server validation (security risk)
-  await supabase.auth.getUser()
+  const { data: { user } } = await supabase.auth.getUser()
 
+  // Redirect unauthenticated users away from protected routes, preserving the
+  // destination so the login page can redirect back after successful auth.
+  const pathname = request.nextUrl.pathname
+  const isProtectedRoute =
+    pathname.startsWith('/decks') ||
+    pathname.startsWith('/settings') ||
+    pathname.startsWith('/profile')
+
+  if (!user && isProtectedRoute) {
+    const loginUrl = new URL('/login', request.url)
+    // Include query string so post-login redirect preserves it (e.g. /decks?filter=starred)
+    loginUrl.searchParams.set('redirectTo', pathname + (request.nextUrl.search ?? ''))
+    return NextResponse.redirect(loginUrl)
+  }
+
+  // Pass current path to Server Components so the layout guard can preserve it in redirects
+  supabaseResponse.headers.set('x-invoke-path', pathname + (request.nextUrl.search ?? ''))
   return supabaseResponse
 }
 

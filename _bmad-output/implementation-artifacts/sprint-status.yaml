@@ -35,7 +35,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 
 generated: 2026-03-21
-last_updated: 2026-03-23  # updated: 1-7 → review
+last_updated: 2026-03-24  # updated: 2-1 → done; 2-3 → done (code review complete); 2-4 → done (E2E deferred to later phase, blocked on login)
 project: Flashcards
 project_key: NOKEY
 tracking_system: file-system
@@ -43,24 +43,24 @@ story_location: "{project-root}/_bmad-output/implementation-artifacts"
 
 development_status:
   # ─── Epic 1: Foundation & Cold Start Experience ───
-  epic-1: in-progress
+  epic-1: done
   1-1-project-scaffold-and-core-infrastructure-setup: done
   1-2-supabase-foundation-and-auth-infrastructure: done
   1-3-cookie-consent-banner-and-gdpr-consent-storage: done
   1-4-anonymous-cold-start-deck-study: done
-  1-5-user-registration-google-oauth-and-email-password: review
+  1-5-user-registration-google-oauth-and-email-password: done
   1-6-anonymous-session-upgrade-to-registered-account: done
-  1-7-team-invite-link-signup: review
-  1-8-user-login-and-logout: ready-for-dev
-  epic-1-retrospective: optional
+  1-7-team-invite-link-signup: done
+  1-8-user-login-and-logout: done
+  epic-1-retrospective: done
 
   # ─── Epic 2: Account Management & GDPR ───
-  epic-2: backlog
-  2-1-profile-information-update: backlog
-  2-2-password-change: backlog
-  2-3-active-session-view-and-revocation: backlog
-  2-4-gdpr-personal-data-export: backlog
-  2-5-gdpr-personal-data-summary: backlog
+  epic-2: in-progress
+  2-1-profile-information-update: done
+  2-2-password-change: done
+  2-3-active-session-view-and-revocation: done
+  2-4-gdpr-personal-data-export: done
+  2-5-gdpr-personal-data-summary: ready-for-dev
   2-6-account-deletion-request: backlog
   epic-2-retrospective: optional
 

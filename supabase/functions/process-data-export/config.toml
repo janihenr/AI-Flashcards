@@ -1,0 +1,2 @@
+[functions.process-data-export]
+# HTTP-triggered only — no cron schedule; invoked from Next.js Server Action via after()

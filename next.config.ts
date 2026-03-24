@@ -15,7 +15,11 @@ if (typeof window === 'undefined' && process.env.DATABASE_URL && process.env.SYS
 const nextConfig: NextConfig = {
   images: {
     remotePatterns: [
-      // Supabase Storage domain will be added in Story 1.2
+      {
+        protocol: 'https',
+        hostname: '*.supabase.co',
+        pathname: '/storage/v1/object/public/**',
+      },
     ],
   },
 
@@ -33,9 +37,9 @@ const nextConfig: NextConfig = {
               "default-src 'self'",
               "script-src 'self' 'unsafe-eval' 'unsafe-inline'", // unsafe-eval required by Next.js dev
               "style-src 'self' 'unsafe-inline'",
-              "img-src 'self' data: blob:",
+              "img-src 'self' data: blob: https://*.supabase.co",
               "font-src 'self'",
-              "connect-src 'self' https://vitals.vercel-insights.com https://*.sentry.io",
+              "connect-src 'self' https://vitals.vercel-insights.com https://*.sentry.io https://*.supabase.co",
               "frame-ancestors 'none'",
             ].join('; '),
           },

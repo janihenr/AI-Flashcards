@@ -42,7 +42,7 @@ export async function signUpWithEmail(
     email: parsed.data.email,
     password: parsed.data.password,
     options: {
-      emailRedirectTo: `${process.env.NEXT_PUBLIC_APP_URL}/api/auth/callback`,
+      emailRedirectTo: `${process.env.NEXT_PUBLIC_APP_URL?.replace(/\/$/, '')}/api/auth/callback`,
     },
   })
   if (error) return { data: null, error: { message: error.message } }
@@ -50,7 +50,7 @@ export async function signUpWithEmail(
   // Supabase silently succeeds for already-registered emails (no error, no email sent).
   // Detect this: identities array is empty for duplicate signups.
   // Return the same message to avoid revealing whether an email is registered (enumeration protection).
-  if (signUpData.user?.identities?.length === 0) {
+  if (signUpData?.user?.identities?.length === 0) {
     return { data: { message: 'Check your email to verify your account' }, error: null }
   }
 
@@ -71,10 +71,12 @@ export async function signInWithGoogle(tosAccepted: boolean): Promise<Result<{ u
   if (!process.env.NEXT_PUBLIC_APP_URL) {
     return { data: null, error: { message: 'App URL not configured', code: 'CONFIG_ERROR' } }
   }
-  // Set tos_accepted server-side — checked in /api/auth/callback to record gdprConsentAt
+  // Set tos_accepted server-side — checked in /api/auth/callback to record gdprConsentAt.
+  // httpOnly: true — the callback reads it server-side via cookies(), which can read httpOnly cookies.
+  // Keeping it httpOnly prevents client JS from forging the consent signal via XSS.
   const cookieStore = await cookies()
   cookieStore.set('tos_accepted', 'true', {
-    httpOnly: false, // must be readable by the callback after OAuth redirect
+    httpOnly: true,
     maxAge: 300,
     sameSite: 'lax',
     secure: process.env.NODE_ENV === 'production',
@@ -84,7 +86,7 @@ export async function signInWithGoogle(tosAccepted: boolean): Promise<Result<{ u
   const { data, error } = await supabase.auth.signInWithOAuth({
     provider: 'google',
     options: {
-      redirectTo: `${process.env.NEXT_PUBLIC_APP_URL}/api/auth/callback`,
+      redirectTo: `${process.env.NEXT_PUBLIC_APP_URL?.replace(/\/$/, '')}/api/auth/callback`,
     },
   })
   if (error) return { data: null, error: { message: error.message } }

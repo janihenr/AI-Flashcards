@@ -11,9 +11,12 @@ test.describe('Cold Start Deck Study', () => {
   })
 
   test('first card renders in < 1 second (NFR-PERF4)', async ({ page }) => {
+    // This NFR is only meaningful against a production build.
+    // In dev mode, Next.js compilation and remote Supabase latency add 3–5 s of overhead.
+    test.skip(!process.env.CI, 'NFR-PERF4 only enforced in CI against a production build')
+
     const start = Date.now()
     await page.goto('/cold-start')
-    // Wait for first card to appear
     await expect(page.locator('[style*="perspective"]').first()).toBeVisible()
     const elapsed = Date.now() - start
     expect(elapsed).toBeLessThan(1000)
@@ -59,17 +62,24 @@ test.describe('Cold Start Deck Study', () => {
       // Flip it
       await card.click()
 
-      // Wait for Good button to be enabled (session ready)
+      // Wait for Good button to be enabled (session ready).
+      // signInAnonymously against a remote Supabase can take 15–20 s in dev.
       const goodBtn = page.getByRole('button', { name: /Good/i })
-      await expect(goodBtn).toBeVisible({ timeout: 5000 })
-      await expect(goodBtn).toBeEnabled({ timeout: 10000 })
+      await expect(goodBtn).toBeEnabled({ timeout: 30000 })
 
-      // Rate as Good
       await goodBtn.click()
+
+      // handleRate is async (awaits rateAnonymousCard before advancing).
+      // Wait for the card to actually change before the next iteration:
+      // - Cards 1–9: new unflipped card shows "Click to reveal"
+      // - Card 10: Session Complete screen appears
+      if (i < 9) {
+        await expect(page.getByText('Click to reveal')).toBeVisible({ timeout: 30000 })
+      }
     }
 
     // Completion screen should appear
-    await expect(page.getByText('Session Complete!')).toBeVisible({ timeout: 5000 })
+    await expect(page.getByText('Session Complete!')).toBeVisible({ timeout: 30000 })
   })
 
   test('completion screen has signup CTA', async ({ page }) => {
@@ -81,9 +91,15 @@ test.describe('Cold Start Deck Study', () => {
       await expect(card).toBeVisible({ timeout: 5000 })
       await card.click()
 
+      // signInAnonymously against remote Supabase can take 15–20 s in dev
       const goodBtn = page.getByRole('button', { name: /Good/i })
-      await expect(goodBtn).toBeEnabled({ timeout: 10000 })
+      await expect(goodBtn).toBeEnabled({ timeout: 30000 })
       await goodBtn.click()
+
+      // Wait for card to advance before next iteration (see note in previous test)
+      if (i < 9) {
+        await expect(page.getByText('Click to reveal')).toBeVisible({ timeout: 30000 })
+      }
     }
 
     // CTA buttons should be present

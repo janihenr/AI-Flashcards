@@ -119,7 +119,7 @@ test.describe('Invite page — valid token form (requires seeded valid-invite-to
     const submitBtn = page.getByRole('button', { name: /create account & join team/i })
     await expect(submitBtn).toBeDisabled()
 
-    await page.getByLabel(/invite-password/i).fill('ValidPass123!')
+    await page.locator('#invite-password').fill('ValidPass123!')
     await page.getByLabel(/accept terms of service/i).click()
     await expect(submitBtn).toBeEnabled()
   })
@@ -157,7 +157,7 @@ test.describe('Invite page — valid token form (requires seeded valid-invite-to
       return
     }
 
-    await page.getByLabel(/invite-password/i).fill('ValidPass123!')
+    await page.locator('#invite-password').fill('ValidPass123!')
     await page.getByLabel(/accept terms of service/i).click()
     await page.getByRole('button', { name: /create account & join team/i }).click()
 

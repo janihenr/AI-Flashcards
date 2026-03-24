@@ -5,6 +5,7 @@ export const ErrorCodes = {
   UNAUTHORIZED: 'UNAUTHORIZED',
   NOT_FOUND: 'NOT_FOUND',
   STRIPE_WEBHOOK_DUPLICATE: 'STRIPE_WEBHOOK_DUPLICATE',
+  EXPORT_IN_PROGRESS: 'EXPORT_IN_PROGRESS',
 } as const
 
 export type ErrorCode = typeof ErrorCodes[keyof typeof ErrorCodes]

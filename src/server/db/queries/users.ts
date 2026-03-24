@@ -3,6 +3,11 @@ import { profiles, anonymousSessions } from '@/server/db/schema'
 import { eq } from 'drizzle-orm'
 import type { Result } from '@/types'
 
+type ProfileUpdateData = {
+  displayName?: string | null
+  avatarUrl?: string | null
+}
+
 type ProfileUpsertData = {
   tier?: string
   gdprConsentAt?: Date | null
@@ -35,6 +40,31 @@ export async function upsertProfile(
       // UPDATE must NOT overwrite an existing consent timestamp
       set: { tier, isAdmin },
     })
+}
+
+export async function updateProfile(
+  userId: string,
+  data: ProfileUpdateData
+): Promise<Result<void>> {
+  // Explicit whitelist — never spread unknown keys into set()
+  const patch: { displayName?: string | null; avatarUrl?: string | null } = {}
+  if ('displayName' in data) patch.displayName = data.displayName
+  if ('avatarUrl' in data) patch.avatarUrl = data.avatarUrl
+
+  if (Object.keys(patch).length === 0) {
+    return { data: undefined, error: null } // no-op, nothing to write
+  }
+
+  try {
+    await db
+      .update(profiles)
+      .set(patch)
+      .where(eq(profiles.id, userId))
+    return { data: undefined, error: null }
+  } catch (err) {
+    console.error('[updateProfile] DB error:', err)
+    return { data: null, error: { message: 'Database error', code: 'DB_ERROR' } }
+  }
 }
 
 export async function getUserProfile(userId: string): Promise<Result<typeof profiles.$inferSelect>> {
