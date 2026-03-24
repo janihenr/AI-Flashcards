@@ -52,10 +52,10 @@ const nextConfig: NextConfig = {
     return []
   },
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   experimental: {
     // turbopack is enabled via next dev --turbopack flag in dev script
     serverActionsBodySizeLimit: '6mb',
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   } as any,
 }
 

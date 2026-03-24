@@ -31,7 +31,6 @@ export function AddCardForm({ deckId, deckTitle }: AddCardFormProps) {
       // Defer focus until after DOM update
       setTimeout(() => frontInputRef.current?.focus(), 0)
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [state?.data?.id])
 
   function handleImageChange(e: React.ChangeEvent<HTMLInputElement>) {

@@ -1,3 +1,5 @@
+import Link from 'next/link'
+
 export const metadata = { title: 'Account Deleted' }
 
 export default function AccountDeletedPage() {
@@ -10,9 +12,9 @@ export default function AccountDeletedPage() {
         <p className="text-sm text-muted-foreground">
           Payment information managed by Stripe is not affected.
         </p>
-        <a href="/" className="text-sm underline text-foreground">
+        <Link href="/" className="text-sm underline text-foreground">
           Return to home
-        </a>
+        </Link>
     </div>
   )
 }
