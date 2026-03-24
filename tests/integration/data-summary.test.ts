@@ -218,8 +218,8 @@ beforeEach(() => {
   vi.resetAllMocks()
 
   // Re-apply component mocks after reset (resetAllMocks clears mockReturnValue too)
-  vi.mocked(DataExportSection).mockReturnValue(null)
-  vi.mocked(DeleteAccountSection).mockReturnValue(null)
+  vi.mocked(DataExportSection).mockReturnValue(null as never)
+  vi.mocked(DeleteAccountSection).mockReturnValue(null as never)
 
   vi.mocked(createUserClient).mockResolvedValue(makeAuthenticatedUser() as never)
   vi.mocked(createServerAdminClient).mockReturnValue(makeMockAdminClient() as never)
